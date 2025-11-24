@@ -1,3 +1,4 @@
+/* eslint-disable react-native/no-inline-styles */
 import { View, Dimensions } from 'react-native'
 import React from 'react'
 import { useColorScheme } from 'nativewind'

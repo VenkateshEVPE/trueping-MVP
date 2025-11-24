@@ -1,3 +1,4 @@
+/* eslint-disable react-native/no-inline-styles */
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Keyboard, Animated, Modal } from 'react-native'
 import React, { useState, useRef, useEffect } from 'react'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
