@@ -1,14 +1,16 @@
 /* eslint-disable react-native/no-inline-styles */
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Keyboard, Animated, Modal } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Keyboard, Animated, Modal, ActivityIndicator } from 'react-native'
 import React, { useState, useRef, useEffect } from 'react'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import { BlurView } from '@react-native-community/blur'
 import GridPatternBackground from '../components/GridPatternBackground'
+import { signUp } from '../services/auth/auth'
 
 const SignUp = () => {
   const insets = useSafeAreaInsets()
   const navigation = useNavigation()
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -16,13 +18,19 @@ const SignUp = () => {
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false)
   const [showBackArrow, setShowBackArrow] = useState(true)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState(null)
   
   const scrollViewRef = useRef(null)
+  const emailInputRef = useRef(null)
+  const emailContainerRef = useRef(null)
+  const passwordInputRef = useRef(null)
+  const passwordContainerRef = useRef(null)
   const confirmPasswordInputRef = useRef(null)
   const confirmPasswordContainerRef = useRef(null)
   const originalScrollY = useRef(0)
   const currentScrollY = useRef(0)
-  const isConfirmPasswordFocused = useRef(false)
+  const focusedFieldRef = useRef(null) // Track which field is focused
   const lastScrollY = useRef(0)
   const backArrowOpacity = useRef(new Animated.Value(1)).current
   const modalOpacity = useRef(new Animated.Value(0)).current
@@ -62,25 +70,57 @@ const SignUp = () => {
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
       setIsKeyboardVisible(true)
-      // Only scroll if confirm password field is focused
-      if (isConfirmPasswordFocused.current && scrollViewRef.current) {
+      // Scroll to focused field when keyboard appears
+      if (focusedFieldRef.current && scrollViewRef.current) {
         setTimeout(() => {
-          if (scrollViewRef.current) {
-            scrollViewRef.current.scrollToEnd({ animated: true })
+          if (scrollViewRef.current && focusedFieldRef.current) {
+            // Try to measure and scroll to the focused field
+            focusedFieldRef.current.measureLayout(
+              scrollViewRef.current,
+              (x, y, width, height) => {
+                // Scroll to show the field with some padding from top
+                const scrollY = Math.max(0, y - 130) // 130px padding from top
+                scrollViewRef.current?.scrollTo({
+                  y: scrollY,
+                  animated: true,
+                })
+                // Update current scroll position
+                currentScrollY.current = scrollY
+                lastScrollY.current = scrollY
+              },
+              () => {
+                // Fallback: scroll to end if measure fails (for lower fields)
+                scrollViewRef.current?.scrollToEnd({ animated: true })
+                // Update scroll position after scrolling
+                setTimeout(() => {
+                  if (scrollViewRef.current) {
+                    scrollViewRef.current.measure((x, y, width, height, pageX, pageY) => {
+                      // This is a workaround - we'll update on next scroll event
+                    })
+                  }
+                }, 100)
+              }
+            )
           }
-        }, 100)
+        }, 150) // Increased timeout to ensure layout is ready
       }
     })
     
     const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
       setIsKeyboardVisible(false)
-      // Revert to original scroll position when keyboard hides
-      if (scrollViewRef.current && originalScrollY.current !== undefined && originalScrollY.current >= 0) {
-        scrollViewRef.current.scrollTo({
-          y: originalScrollY.current,
-          animated: true,
-        })
-      }
+      // Scroll to top when keyboard hides
+      setTimeout(() => {
+        if (scrollViewRef.current) {
+          scrollViewRef.current.scrollTo({
+            y: 0,
+            animated: true,
+          })
+          // Update scroll position tracking
+          currentScrollY.current = 0
+          lastScrollY.current = 0
+          originalScrollY.current = 0
+        }
+      }, 100)
     })
 
     return () => {
@@ -89,24 +129,143 @@ const SignUp = () => {
     }
   }, [])
 
-  // Handle confirm password field focus
-  const handleConfirmPasswordFocus = () => {
+  // Generic field focus handler
+  const handleFieldFocus = (containerRef) => {
     // Store current scroll position before keyboard appears
     originalScrollY.current = currentScrollY.current
-    // Mark that confirm password field is focused
-    isConfirmPasswordFocused.current = true
-    // Don't scroll here - wait for keyboard to show
+    // Mark which field is focused
+    focusedFieldRef.current = containerRef.current
   }
 
-  // Handle confirm password field blur
-  const handleConfirmPasswordBlur = () => {
-    isConfirmPasswordFocused.current = false
+  // Generic field blur handler
+  const handleFieldBlur = () => {
+    focusedFieldRef.current = null
+    // Show back arrow when field loses focus (if keyboard is not visible)
+    if (!isKeyboardVisible && !showBackArrow) {
+      setShowBackArrow(true)
+      Animated.timing(backArrowOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start()
+    }
+  }
+
+  // Handle email field focus
+  const handleEmailFocus = () => {
+    handleFieldFocus(emailContainerRef)
+    // Hide back arrow when email field is focused
+    if (showBackArrow) {
+      setShowBackArrow(false)
+      Animated.timing(backArrowOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start()
+    }
+    // Force scroll for email field
+    setTimeout(() => {
+      if (emailContainerRef.current && scrollViewRef.current) {
+        emailContainerRef.current.measureLayout(
+          scrollViewRef.current,
+          (x, y, width, height) => {
+            const scrollY = Math.max(0, y - 130)
+            scrollViewRef.current?.scrollTo({
+              y: scrollY,
+              animated: true,
+            })
+            currentScrollY.current = scrollY
+            lastScrollY.current = scrollY
+          },
+          () => {
+            // Fallback scroll
+            scrollViewRef.current?.scrollToEnd({ animated: true })
+          }
+        )
+      }
+    }, 200)
+  }
+
+  // Handle password field focus
+  const handlePasswordFocus = () => {
+    handleFieldFocus(passwordContainerRef)
+  }
+
+  // Handle confirm password field focus
+  const handleConfirmPasswordFocus = () => {
+    handleFieldFocus(confirmPasswordContainerRef)
+    // Force scroll for confirm password field
+    setTimeout(() => {
+      if (confirmPasswordContainerRef.current && scrollViewRef.current) {
+        confirmPasswordContainerRef.current.measureLayout(
+          scrollViewRef.current,
+          (x, y, width, height) => {
+            const scrollY = Math.max(0, y - 130)
+            scrollViewRef.current?.scrollTo({
+              y: scrollY,
+              animated: true,
+            })
+            currentScrollY.current = scrollY
+            lastScrollY.current = scrollY
+          },
+          () => {
+            // Fallback scroll to end
+            scrollViewRef.current?.scrollToEnd({ animated: true })
+          }
+        )
+      }
+    }, 200)
   }
 
   // Handle create account
-  const handleCreateAccount = () => {
-    // Show success modal
-    setShowSuccessModal(true)
+  const handleCreateAccount = async () => {
+    // Validate form
+    if (!name.trim()) {
+      setError('Please enter your name')
+      return
+    }
+    
+    if (!isEmailValid) {
+      setError('Please enter a valid email address')
+      return
+    }
+    
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters')
+      return
+    }
+    
+    if (password !== confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
+    
+    if (!agreeToTerms) {
+      setError('Please agree to the terms and conditions')
+      return
+    }
+
+    setIsLoading(true)
+    setError(null)
+    Keyboard.dismiss()
+
+    try {
+      await signUp({
+        name: name.trim(),
+        email: email.trim(),
+        password: password,
+        role: 'contributor',
+      })
+      
+      // Success - show success modal
+      setIsLoading(false)
+      setShowSuccessModal(true)
+    } catch (err) {
+      setIsLoading(false)
+      // Handle error
+      const errorMessage = err.data?.message || err.message || 'Something went wrong. Please try again.'
+      setError(errorMessage)
+    }
   }
 
   // Handle continue button
@@ -222,18 +381,37 @@ const SignUp = () => {
 
           {/* Form container */}
           <View className="mb-6">
-            {/* Email container */}
+            {/* Name container */}
             <View className="mb-6">
+              <Text className="text-xl mb-2 font-satoshi text-text dark:text-white">
+                Name
+              </Text>
+              <TextInput
+                className="h-[49px] px-3 text-base border font-satoshi bg-inputBackground dark:bg-[#212322] border-inputBorder dark:border-black text-text dark:text-white"
+                placeholder="Enter your name here"
+                placeholderTextColor="#54565a"
+                value={name}
+                onChangeText={setName}
+                autoCapitalize="words"
+                autoCorrect={false}
+              />
+            </View>
+
+            {/* Email container */}
+            <View ref={emailContainerRef} className="mb-6">
               <Text className="text-xl mb-2 font-satoshi text-text dark:text-white">
                 Email ID
               </Text>
               <View className="relative">
                 <TextInput
+                  ref={emailInputRef}
                   className="h-[49px] px-3 text-base border font-satoshi bg-inputBackground dark:bg-[#212322] border-inputBorder dark:border-black text-text dark:text-white"
                   placeholder="Enter your email id here"
                   placeholderTextColor="#54565a"
                   value={email}
                   onChangeText={setEmail}
+                  onFocus={handleEmailFocus}
+                  onBlur={handleFieldBlur}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -247,16 +425,19 @@ const SignUp = () => {
             </View>
 
             {/* Password container */}
-            <View className="mb-6">
+            <View ref={passwordContainerRef} className="mb-6">
               <Text className="text-xl mb-2 font-satoshi text-text dark:text-white">
                 Password
               </Text>
               <TextInput
+                ref={passwordInputRef}
                 className="h-[49px] px-3 text-base border font-satoshi bg-inputBackground dark:bg-[#212322] border-inputBorder dark:border-black text-text dark:text-white"
                 placeholder="Enter your password here"
                 placeholderTextColor="#54565a"
                 value={password}
                 onChangeText={setPassword}
+                onFocus={handlePasswordFocus}
+                onBlur={handleFieldBlur}
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -276,7 +457,7 @@ const SignUp = () => {
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 onFocus={handleConfirmPasswordFocus}
-                onBlur={handleConfirmPasswordBlur}
+                onBlur={handleFieldBlur}
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -284,10 +465,20 @@ const SignUp = () => {
             </View>
           </View>
 
+          {/* Error message */}
+          {error && (
+            <View className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded">
+              <Text className="text-red-400 text-sm font-satoshi">{error}</Text>
+            </View>
+          )}
+
           {/* Terms and conditions checkbox */}
           <View className="flex-row items-start mb-8">
             <TouchableOpacity
-              onPress={() => setAgreeToTerms(!agreeToTerms)}
+              onPress={() => {
+                setAgreeToTerms(!agreeToTerms)
+                setError(null)
+              }}
               className="w-[21px] h-[21px] mr-4 mt-1 border items-center justify-center bg-inputBackground dark:bg-[#212322] border-text dark:border-white"
             >
               {agreeToTerms && (
@@ -303,10 +494,16 @@ const SignUp = () => {
           <TouchableOpacity 
             className="w-full py-3 items-center justify-center bg-buttonBackground"
             onPress={handleCreateAccount}
+            disabled={isLoading}
+            style={{ opacity: isLoading ? 0.6 : 1 }}
           >
-            <Text className="text-xl font-satoshiMedium text-buttonText">
-              Create account
-            </Text>
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#1c1c1c" />
+            ) : (
+              <Text className="text-xl font-satoshiMedium text-buttonText">
+                Create account
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>

@@ -1,14 +1,17 @@
-import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Keyboard } from 'react-native'
 import React, { useState } from 'react'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import GridPatternBackground from '../components/GridPatternBackground'
+import { signIn } from '../services/auth/auth'
 
 const SignIn = () => {
   const insets = useSafeAreaInsets()
   const navigation = useNavigation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState(null)
 
   // Email validation function
   const isValidEmail = (emailValue) => {
@@ -17,6 +20,43 @@ const SignIn = () => {
   }
 
   const isEmailValid = isValidEmail(email)
+
+  // Handle login
+  const handleLogin = async () => {
+    // Validate form
+    if (!isEmailValid) {
+      setError('Please enter a valid email address')
+      return
+    }
+    
+    if (!password || password.length < 6) {
+      setError('Password must be at least 6 characters')
+      return
+    }
+
+    setIsLoading(true)
+    setError(null)
+    Keyboard.dismiss()
+
+    try {
+      const response = await signIn({
+        email: email.trim(),
+        password: password,
+      })
+      
+      // Success - handle successful login
+      setIsLoading(false)
+      // TODO: Store token/user data and navigate to home screen
+      console.log('Login successful:', response)
+      // For now, you can navigate to a home screen or show success
+      // navigation.navigate('home')
+    } catch (err) {
+      setIsLoading(false)
+      // Handle error
+      const errorMessage = err.data?.message || err.message || 'Invalid email or password. Please try again.'
+      setError(errorMessage)
+    }
+  }
 
   return (
     <KeyboardAvoidingView 
@@ -90,15 +130,29 @@ const SignIn = () => {
             />
           </View>
 
+          {/* Error message */}
+          {error && (
+            <View className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded">
+              <Text className="text-red-400 text-sm font-satoshi">{error}</Text>
+            </View>
+          )}
+
           {/* Buttons container */}
           <View className="items-center mt-6">
             {/* Login button */}
             <TouchableOpacity 
               className="w-full py-3 items-center justify-center mb-7 bg-buttonBackground"
+              onPress={handleLogin}
+              disabled={isLoading}
+              style={{ opacity: isLoading ? 0.6 : 1 }}
             >
-              <Text className="text-xl font-satoshiMedium text-buttonText">
-                Login in
-              </Text>
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#1c1c1c" />
+              ) : (
+                <Text className="text-xl font-satoshiMedium text-buttonText">
+                  Login in
+                </Text>
+              )}
             </TouchableOpacity>
 
             {/* Or divider */}
