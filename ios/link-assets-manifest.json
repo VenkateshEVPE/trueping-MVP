@@ -1,0 +1,49 @@
+{
+  "migIndex": 1,
+  "data": [
+    {
+      "path": "assets/fonts/OffBitTrial-101.ttf",
+      "sha1": "15ac5667c9cfcc60ab6a2a3e3372ec8b5c418975"
+    },
+    {
+      "path": "assets/fonts/OffBitTrial-101Bold.ttf",
+      "sha1": "9a4f5b9caf02ccbea7a41e43c960cc64141c4896"
+    },
+    {
+      "path": "assets/fonts/OffBitTrial-Bold.ttf",
+      "sha1": "393fbdce6cf1156788a052bf7629417297e13f8e"
+    },
+    {
+      "path": "assets/fonts/OffBitTrial-Dot.ttf",
+      "sha1": "65199d83609c8c41739bdf7d4d2e976623cb4bd2"
+    },
+    {
+      "path": "assets/fonts/OffBitTrial-DotBold.ttf",
+      "sha1": "fd378695103774d1f0d4de7e263b40763882f369"
+    },
+    {
+      "path": "assets/fonts/OffBitTrial-Regular.ttf",
+      "sha1": "a1c4e1616800b683982a7334b1da511e70ecb879"
+    },
+    {
+      "path": "assets/fonts/Satoshi-Black.ttf",
+      "sha1": "fd050e574e3e81d3468651f9bc6184319b25bfc6"
+    },
+    {
+      "path": "assets/fonts/Satoshi-Bold.ttf",
+      "sha1": "b825a4a89b7257537a202316b08997a2d2f00a49"
+    },
+    {
+      "path": "assets/fonts/Satoshi-Light.ttf",
+      "sha1": "ea23468d55ad9a76958cf84a52b71b65bea35db0"
+    },
+    {
+      "path": "assets/fonts/Satoshi-Medium.ttf",
+      "sha1": "e4539f4688c865204a879dc3253d3547f0444818"
+    },
+    {
+      "path": "assets/fonts/Satoshi-Regular.ttf",
+      "sha1": "bc605aa08468cfb9a40275a6386ada56c92a5bed"
+    }
+  ]
+}
