@@ -8,6 +8,9 @@ import { ThemeProvider } from './src/context/ThemeContext';
 import SplashScreen from './src/screens/SplashScreen';
 import SignInPage from './src/screens/SignIn';
 import SignUpPage from './src/screens/SignUp';
+import ForgotPasswordPage from './src/screens/ForgotPassword';
+import OTPVerificationPage from './src/screens/OTPVerification';
+import ResetPasswordPage from './src/screens/ResetPassword';
 
 const Stack = createNativeStackNavigator();
 
@@ -25,6 +28,9 @@ const AppContent = () => {
           <Stack.Screen name="splash" component={SplashScreen} options={{ headerShown: false }} />
           <Stack.Screen name="signIn" component={SignInPage} options={{ headerShown: false }} />
           <Stack.Screen name="signUp" component={SignUpPage} options={{ headerShown: false }} />
+          <Stack.Screen name="forgotPassword" component={ForgotPasswordPage} options={{ headerShown: false }} />
+          <Stack.Screen name="otpVerification" component={OTPVerificationPage} options={{ headerShown: false }} />
+          <Stack.Screen name="resetPassword" component={ResetPasswordPage} options={{ headerShown: false }} />
         </Stack.Navigator>
       </NavigationContainer>
     </>

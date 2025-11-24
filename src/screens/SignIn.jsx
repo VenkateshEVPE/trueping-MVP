@@ -72,7 +72,7 @@ const SignIn = () => {
               <Text className="text-xl font-satoshi text-text dark:text-white">
                 Password
               </Text>
-              <TouchableOpacity>
+              <TouchableOpacity onPress={() => navigation.navigate('forgotPassword')}>
                 <Text className="text-xs mt-2 underline font-satoshi text-buttonBackground">
                   Forgot password ?
                 </Text>

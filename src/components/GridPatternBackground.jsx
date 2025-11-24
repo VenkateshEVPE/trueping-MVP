@@ -41,17 +41,22 @@ const GridPatternBackground = () => {
         {intersections.map((point, index) => (
           <View
             key={`intersection-${index}`}
-            className="absolute w-2 h-2"
+            className="absolute"
             style={{
               left: point.x - CROSS_SIZE,
               top: point.y - CROSS_SIZE,
+              width: CROSS_SIZE * 2,
+              height: CROSS_SIZE * 2,
             }}
           >
             {/* Horizontal line of the "+" */}
             <View
-              className="absolute left-0 w-2 h-px"
               style={{
+                position: 'absolute',
+                left: 0,
                 top: CROSS_SIZE - 0.5,
+                width: CROSS_SIZE * 2,
+                height: 1,
                 backgroundColor: colorScheme === 'dark' 
                   ? `rgba(255, 255, 255, ${point.opacity})`
                   : `rgba(0, 0, 0, ${point.opacity * 0.3})`,
@@ -59,9 +64,12 @@ const GridPatternBackground = () => {
             />
             {/* Vertical line of the "+" */}
             <View
-              className="absolute top-0 w-px h-2"
               style={{
+                position: 'absolute',
                 left: CROSS_SIZE - 0.5,
+                top: 0,
+                width: 1,
+                height: CROSS_SIZE * 2,
                 backgroundColor: colorScheme === 'dark'
                   ? `rgba(255, 255, 255, ${point.opacity})`
                   : `rgba(0, 0, 0, ${point.opacity * 0.3})`,
@@ -72,7 +80,14 @@ const GridPatternBackground = () => {
       </View>
       
       {/* Gradient overlay */}
-      <View className="absolute top-0 left-0 right-0 bottom-0 bg-black/15 dark:bg-white/5" />
+      <View 
+        className="absolute top-0 left-0 right-0 bottom-0"
+        style={{
+          backgroundColor: colorScheme === 'dark' 
+            ? 'rgba(0, 0, 0, 0.15)'
+            : 'rgba(255, 255, 255, 0.05)',
+        }}
+      />
     </>
   )
 }

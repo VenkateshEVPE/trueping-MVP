@@ -1,7 +1,8 @@
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Keyboard, Animated } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Keyboard, Animated, Modal } from 'react-native'
 import React, { useState, useRef, useEffect } from 'react'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
+import { BlurView } from '@react-native-community/blur'
 import GridPatternBackground from '../components/GridPatternBackground'
 
 const SignUp = () => {
@@ -13,6 +14,7 @@ const SignUp = () => {
   const [agreeToTerms, setAgreeToTerms] = useState(false)
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false)
   const [showBackArrow, setShowBackArrow] = useState(true)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
   
   const scrollViewRef = useRef(null)
   const confirmPasswordInputRef = useRef(null)
@@ -22,6 +24,8 @@ const SignUp = () => {
   const isConfirmPasswordFocused = useRef(false)
   const lastScrollY = useRef(0)
   const backArrowOpacity = useRef(new Animated.Value(1)).current
+  const modalOpacity = useRef(new Animated.Value(0)).current
+  const modalTranslateY = useRef(new Animated.Value(50)).current
 
   // Email validation function
   const isValidEmail = (emailValue) => {
@@ -30,6 +34,28 @@ const SignUp = () => {
   }
 
   const isEmailValid = isValidEmail(email)
+
+  // Reset modal animations when modal becomes visible
+  useEffect(() => {
+    if (showSuccessModal) {
+      modalOpacity.setValue(0)
+      modalTranslateY.setValue(50)
+      Animated.parallel([
+        Animated.timing(modalOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(modalTranslateY, {
+          toValue: 0,
+          tension: 50,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+      ]).start()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSuccessModal])
 
   // Handle keyboard show/hide events
   useEffect(() => {
@@ -76,6 +102,31 @@ const SignUp = () => {
     isConfirmPasswordFocused.current = false
   }
 
+  // Handle create account
+  const handleCreateAccount = () => {
+    // Show success modal
+    setShowSuccessModal(true)
+  }
+
+  // Handle continue button
+  const handleContinue = () => {
+    Animated.parallel([
+      Animated.timing(modalOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(modalTranslateY, {
+        toValue: 50,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowSuccessModal(false)
+      navigation.navigate('signIn')
+    })
+  }
+
   return (
     <View className="flex-1 bg-background dark:bg-black">
       {/* Grid pattern background with gradient overlay */}
@@ -83,10 +134,13 @@ const SignUp = () => {
       
       {/* Back button */}
       <Animated.View
-        className="absolute left-5 w-11 h-11 items-center justify-center z-[9999]"
+        className="absolute left-5 items-center justify-center z-[9999]"
         style={{ 
           top: insets.top + 10,
           opacity: backArrowOpacity,
+          width: 44,
+          height: 50,
+          overflow: 'visible',
         }}
         pointerEvents={showBackArrow ? 'auto' : 'none'}
       >
@@ -94,8 +148,9 @@ const SignUp = () => {
           onPress={() => navigation.goBack()}
           activeOpacity={0.7}
           className="w-full h-full items-center justify-center"
+          style={{ paddingTop: 2 }}
         >
-          <Text className="text-[40px] text-text dark:text-white">←</Text>
+          <Text className="text-[40px] text-text dark:text-white" style={{ lineHeight: 40 }}>←</Text>
         </TouchableOpacity>
       </Animated.View>
       
@@ -244,13 +299,70 @@ const SignUp = () => {
           </View>
 
           {/* Create account button */}
-          <TouchableOpacity className="w-full py-3 items-center justify-center bg-buttonBackground">
+          <TouchableOpacity 
+            className="w-full py-3 items-center justify-center bg-buttonBackground"
+            onPress={handleCreateAccount}
+          >
             <Text className="text-xl font-satoshiMedium text-buttonText">
               Create account
             </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Success Modal */}
+      <Modal
+        visible={showSuccessModal}
+        transparent
+        animationType="none"
+        onRequestClose={() => setShowSuccessModal(false)}
+      >
+        <View className="flex-1">
+          {/* Backdrop with Blur */}
+          <Animated.View 
+            className="absolute inset-0"
+            style={{ opacity: modalOpacity }}
+          >
+            <BlurView
+              style={{ flex: 1 }}
+              blurType="dark"
+              blurAmount={10}
+              reducedTransparencyFallbackColor="rgba(0, 0, 0, 0.72)"
+            />
+          </Animated.View>
+          
+          {/* Modal Container at Bottom */}
+          <View className="flex-1 justify-end pb-8 px-5">
+            <Animated.View
+              className="bg-[#212322] rounded-[10px] w-full p-6"
+              style={{
+                transform: [{ translateY: modalTranslateY }],
+                opacity: modalOpacity,
+              }}
+            >
+              {/* Message Container */}
+              <View className="mb-6">
+                <Text className="text-[32px] leading-[50px] font-satoshi text-white mb-4">
+                  Congratulations.
+                </Text>
+                <Text className="text-xl font-satoshi text-white">
+                  Your account has been successfully set up.
+                </Text>
+              </View>
+
+              {/* Continue Button */}
+              <TouchableOpacity
+                className="bg-buttonBackground rounded-[5px] py-3 items-center justify-center"
+                onPress={handleContinue}
+              >
+                <Text className="text-xl font-satoshiMedium text-black">
+                  Continue
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
+        </View>
+      </Modal>
     </View>
   )
 }
