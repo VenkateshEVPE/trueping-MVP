@@ -1,17 +1,22 @@
 /* eslint-disable react-native/no-inline-styles */
-import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Modal, Animated, Keyboard } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Modal, Animated, Keyboard, ActivityIndicator } from 'react-native'
 import React, { useState, useRef, useEffect } from 'react'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, useRoute } from '@react-navigation/native'
 import { BlurView } from '@react-native-community/blur'
 import GridPatternBackground from '../components/GridPatternBackground'
+import { resetPassword } from '../services/auth/auth'
 
 const ResetPassword = () => {
   const insets = useSafeAreaInsets()
   const navigation = useNavigation()
+  const route = useRoute()
+  const { email } = route.params || {}
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState(null)
   
   const modalOpacity = useRef(new Animated.Value(0)).current
   const modalTranslateY = useRef(new Animated.Value(50)).current
@@ -58,12 +63,38 @@ const ResetPassword = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showSuccessModal])
 
-  const handleSubmit = () => {
-    if (isSubmitEnabled) {
-      // Dismiss keyboard before showing modal
-      Keyboard.dismiss()
-      // Show success modal
+  const handleSubmit = async () => {
+    if (!isSubmitEnabled) {
+      return
+    }
+
+    // Validate that we have email
+    if (!email) {
+      setError('Missing email. Please go back and try again.')
+      return
+    }
+
+    setIsLoading(true)
+    setError(null)
+    Keyboard.dismiss()
+
+    try {
+      // Call reset password API
+      const response = await resetPassword({
+        email: email,
+        password: newPassword,
+        confirmPassword: confirmPassword,
+      })
+      
+      // Success - show success modal
+      setIsLoading(false)
+      console.log('Password reset successfully:', response)
       setShowSuccessModal(true)
+    } catch (err) {
+      setIsLoading(false)
+      // Handle error
+      const errorMessage = err.data?.message || err.message || 'Failed to reset password. Please try again.'
+      setError(errorMessage)
     }
   }
 
@@ -174,16 +205,27 @@ const ResetPassword = () => {
             </View>
           </View>
 
+          {/* Error message */}
+          {error && (
+            <View className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded">
+              <Text className="text-red-400 text-sm font-satoshi">{error}</Text>
+            </View>
+          )}
+
           {/* Submit button */}
           <TouchableOpacity 
             className="w-full py-3 items-center justify-center bg-buttonBackground mt-auto"
             onPress={handleSubmit}
-            disabled={!isSubmitEnabled}
-            style={{ opacity: isSubmitEnabled ? 1 : 0.5 }}
+            disabled={!isSubmitEnabled || isLoading}
+            style={{ opacity: (isSubmitEnabled && !isLoading) ? 1 : 0.5 }}
           >
-            <Text className="text-xl font-satoshiMedium text-buttonText">
-              Submit
-            </Text>
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#1c1c1c" />
+            ) : (
+              <Text className="text-xl font-satoshiMedium text-buttonText">
+                Submit
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>

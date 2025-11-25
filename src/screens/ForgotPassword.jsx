@@ -1,14 +1,17 @@
 /* eslint-disable react-native/no-inline-styles */
-import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Keyboard } from 'react-native'
 import React, { useState, useRef, useEffect } from 'react'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import GridPatternBackground from '../components/GridPatternBackground'
+import { sendOTP } from '../services/auth/auth'
 
 const ForgotPassword = () => {
   const insets = useSafeAreaInsets()
   const navigation = useNavigation()
   const [email, setEmail] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState(null)
   const emailInputRef = useRef(null)
 
   // Auto-focus email input when screen loads
@@ -27,10 +30,31 @@ const ForgotPassword = () => {
 
   const isEmailValid = isValidEmail(email)
 
-  const handleRequestOTP = () => {
-    if (isEmailValid) {
-      // Navigate to OTP verification screen
-      navigation.navigate('otpVerification', { email })
+  const handleRequestOTP = async () => {
+    // Validate email
+    if (!isEmailValid) {
+      setError('Please enter a valid email address')
+      return
+    }
+
+    setIsLoading(true)
+    setError(null)
+    Keyboard.dismiss()
+
+    try {
+      const response = await sendOTP(email.trim())
+      
+      // Success - navigate to OTP verification screen
+      setIsLoading(false)
+      console.log('OTP sent successfully:', response)
+      navigation.navigate('otpVerification', { 
+        email: email.trim()
+      })
+    } catch (err) {
+      setIsLoading(false)
+      // Handle error
+      const errorMessage = err.data?.message || err.message || 'Failed to send OTP. Please try again.'
+      setError(errorMessage)
     }
   }
 
@@ -115,14 +139,27 @@ const ForgotPassword = () => {
             </View>
           </View>
 
+          {/* Error message */}
+          {error && (
+            <View className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded">
+              <Text className="text-red-400 text-sm font-satoshi">{error}</Text>
+            </View>
+          )}
+
           {/* Request OTP button */}
           <TouchableOpacity 
             className="w-full py-3 items-center justify-center bg-buttonBackground mt-auto"
             onPress={handleRequestOTP}
+            disabled={isLoading}
+            style={{ opacity: isLoading ? 0.6 : 1 }}
           >
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#1c1c1c" />
+            ) : (
             <Text className="text-xl font-satoshiMedium text-buttonText">
               Request OTP
             </Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>

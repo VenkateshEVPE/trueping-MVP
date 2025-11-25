@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import GridPatternBackground from '../components/GridPatternBackground'
 import { signIn } from '../services/auth/auth'
+import { saveUser, updateUserToken } from '../database/database'
 
 const SignIn = () => {
   const insets = useSafeAreaInsets()
@@ -44,12 +45,35 @@ const SignIn = () => {
         password: password,
       })
       
+      // Save/update user in database
+      try {
+        const token = response.token || response.access_token || null
+        await saveUser({
+          id: response.id,
+          user_id: response.id,
+          name: response.name || '',
+          email: email.trim(),
+          role: response.role || '',
+          token: token,
+          email_verified: response.email_verified ? 1 : 0,
+        })
+        
+        // Update token if separate call needed
+        if (token) {
+          await updateUserToken(email.trim(), token)
+        }
+        
+        console.log('User data saved to database successfully')
+      } catch (dbError) {
+        console.error('Error saving user to database:', dbError)
+        // Continue even if database save fails
+      }
+      
       // Success - handle successful login
       setIsLoading(false)
-      // TODO: Store token/user data and navigate to home screen
       console.log('Login successful:', response)
-      // For now, you can navigate to a home screen or show success
-      // navigation.navigate('home')
+      // Navigate to tabs screen
+      navigation.replace('tabs')
     } catch (err) {
       setIsLoading(false)
       // Handle error
@@ -149,9 +173,9 @@ const SignIn = () => {
               {isLoading ? (
                 <ActivityIndicator size="small" color="#1c1c1c" />
               ) : (
-                <Text className="text-xl font-satoshiMedium text-buttonText">
-                  Login in
-                </Text>
+              <Text className="text-xl font-satoshiMedium text-buttonText">
+                Login in
+              </Text>
               )}
             </TouchableOpacity>
 

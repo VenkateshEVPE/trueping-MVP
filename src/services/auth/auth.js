@@ -25,12 +25,12 @@ export const signIn = async (credentials) => {
 }
 
 /**
- * Request OTP for password reset
+ * Send OTP to email
  * @param {string} email - User email address
- * @returns {Promise<object>} - Response data
+ * @returns {Promise<object>} - Response data { message, email }
  */
-export const requestOTP = async (email) => {
-  return apiRequest('auth/forgot-password', {
+export const sendOTP = async (email) => {
+  return apiRequest('auth/send-otp', {
     method: 'POST',
     body: { email },
   })
@@ -39,7 +39,7 @@ export const requestOTP = async (email) => {
 /**
  * Verify OTP
  * @param {object} otpData - OTP data { email, otp }
- * @returns {Promise<object>} - Response data
+ * @returns {Promise<object>} - Response data { message, email, email_verified }
  */
 export const verifyOTP = async (otpData) => {
   return apiRequest('auth/verify-otp', {
@@ -50,7 +50,7 @@ export const verifyOTP = async (otpData) => {
 
 /**
  * Reset password
- * @param {object} resetData - Reset data { email, otp, newPassword }
+ * @param {object} resetData - Reset data { email, password, confirmPassword }
  * @returns {Promise<object>} - Response data
  */
 export const resetPassword = async (resetData) => {

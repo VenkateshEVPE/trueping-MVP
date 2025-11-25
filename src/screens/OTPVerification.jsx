@@ -1,27 +1,47 @@
 /* eslint-disable react-native/no-inline-styles */
-import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Keyboard } from 'react-native'
 import React, { useState, useEffect, useRef } from 'react'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, useRoute } from '@react-navigation/native'
 import GridPatternBackground from '../components/GridPatternBackground'
+import { sendOTP, verifyOTP } from '../services/auth/auth'
+import { updateEmailVerification } from '../database/database'
 
 const OTPVerification = () => {
   const insets = useSafeAreaInsets()
   const navigation = useNavigation()
+  const route = useRoute()
+  const { email, otp: otpFromApi } = route.params || {}
   const [otp, setOtp] = useState(['', '', '', ''])
   const [showX, setShowX] = useState([false, false, false, false]) // Track which digits should show "x"
   const [timeLeft, setTimeLeft] = useState(45) // 45 seconds countdown
   const [canResend, setCanResend] = useState(false)
+  const [isVerifying, setIsVerifying] = useState(false)
+  const [error, setError] = useState(null)
   const inputRefs = useRef([])
   const timersRef = useRef([])
+
+  // Auto-fill OTP from API response if available
+  useEffect(() => {
+    if (otpFromApi && typeof otpFromApi === 'string' && otpFromApi.length === 4) {
+      const otpArray = otpFromApi.split('').slice(0, 4)
+      setOtp(otpArray)
+      // Show digits initially, then hide them after a moment
+      setTimeout(() => {
+        setShowX([true, true, true, true])
+      }, 100)
+    }
+  }, [otpFromApi])
 
   // Auto-focus first OTP input when screen loads
   useEffect(() => {
     const timer = setTimeout(() => {
-      inputRefs.current[0]?.focus()
+      if (!otpFromApi) {
+        inputRefs.current[0]?.focus()
+      }
     }, 300)
     return () => clearTimeout(timer)
-  }, [])
+  }, [otpFromApi])
 
   // Countdown timer
   useEffect(() => {
@@ -107,14 +127,33 @@ const OTPVerification = () => {
   }
 
   // Handle resend OTP
-  const handleResendOTP = () => {
-    if (canResend) {
+  const handleResendOTP = async () => {
+    if (canResend && email) {
+      try {
+        const response = await sendOTP(email)
+        
+        // Update OTP from response
+        if (response.otp || response.OTP) {
+          const otpValue = (response.otp || response.OTP).toString()
+          const newOtp = otpValue.split('').slice(0, 4)
+          setOtp(newOtp)
+          setTimeout(() => {
+            setShowX([true, true, true, true])
+          }, 100)
+        }
+        
+        setTimeLeft(45)
+        setCanResend(false)
+        inputRefs.current[0]?.focus()
+        console.log('OTP resent successfully:', response)
+      } catch (err) {
+        console.error('Failed to resend OTP:', err)
+        // Still reset timer even if API call fails
       setTimeLeft(45)
       setCanResend(false)
       setOtp(['', '', '', ''])
       inputRefs.current[0]?.focus()
-      // Here you would typically call your API to resend OTP
-      console.log('Resending OTP...')
+      }
     }
   }
 
@@ -126,12 +165,52 @@ const OTPVerification = () => {
   }
 
   // Handle verify OTP
-  const handleVerifyOTP = () => {
+  const handleVerifyOTP = async () => {
     const otpString = otp.join('')
-    if (otpString.length === 4) {
-      // Navigate to reset password screen
-      console.log('Verifying OTP:', otpString)
-      navigation.navigate('resetPassword')
+    if (otpString.length !== 4) {
+      setError('Please enter complete OTP')
+      return
+    }
+
+    if (!email) {
+      setError('Email not found. Please go back and try again.')
+      return
+    }
+
+    setIsVerifying(true)
+    setError(null)
+    Keyboard.dismiss()
+
+    try {
+      // Call verify OTP API
+      const response = await verifyOTP({
+        email: email,
+        otp: otpString,
+      })
+      
+      // Update email verification status in database
+      if (response.email_verified) {
+        try {
+          await updateEmailVerification(email, true)
+          console.log('Email verification status updated in database')
+        } catch (dbError) {
+          console.error('Error updating email verification:', dbError)
+          // Continue even if database update fails
+        }
+      }
+      
+      // Success - navigate to reset password screen
+      console.log('OTP verified successfully:', response)
+      setIsVerifying(false)
+      navigation.navigate('resetPassword', { email, otp: otpString })
+    } catch (err) {
+      setIsVerifying(false)
+      const errorMessage = err.data?.message || err.message || 'Invalid OTP. Please check and try again.'
+      setError(errorMessage)
+      // Clear OTP inputs on error
+      setOtp(['', '', '', ''])
+      setShowX([false, false, false, false])
+      inputRefs.current[0]?.focus()
     }
   }
 
@@ -252,15 +331,27 @@ const OTPVerification = () => {
             </Text>
           </View>
 
+          {/* Error message */}
+          {error && (
+            <View className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded">
+              <Text className="text-red-400 text-sm font-satoshi">{error}</Text>
+            </View>
+          )}
+
           {/* Verify OTP button */}
           <TouchableOpacity 
-            className={`w-full py-3 items-center justify-center bg-buttonBackground ${!isOtpComplete ? 'opacity-50' : ''}`}
+            className={`w-full py-3 items-center justify-center bg-buttonBackground ${!isOtpComplete || isVerifying ? 'opacity-50' : ''}`}
             onPress={handleVerifyOTP}
-            disabled={!isOtpComplete}
+            disabled={!isOtpComplete || isVerifying}
+            style={{ opacity: (!isOtpComplete || isVerifying) ? 0.6 : 1 }}
           >
+            {isVerifying ? (
+              <ActivityIndicator size="small" color="#1c1c1c" />
+            ) : (
             <Text className="text-xl font-satoshiMedium text-buttonText">
               Verify OTP
             </Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>

@@ -6,6 +6,7 @@ import { useNavigation } from '@react-navigation/native'
 import { BlurView } from '@react-native-community/blur'
 import GridPatternBackground from '../components/GridPatternBackground'
 import { signUp } from '../services/auth/auth'
+import { saveUser } from '../database/database'
 
 const SignUp = () => {
   const insets = useSafeAreaInsets()
@@ -92,13 +93,13 @@ const SignUp = () => {
                 // Fallback: scroll to end if measure fails (for lower fields)
                 scrollViewRef.current?.scrollToEnd({ animated: true })
                 // Update scroll position after scrolling
-                setTimeout(() => {
-                  if (scrollViewRef.current) {
+        setTimeout(() => {
+          if (scrollViewRef.current) {
                     scrollViewRef.current.measure((x, y, width, height, pageX, pageY) => {
                       // This is a workaround - we'll update on next scroll event
                     })
-                  }
-                }, 100)
+          }
+        }, 100)
               }
             )
           }
@@ -111,15 +112,15 @@ const SignUp = () => {
       // Scroll to top when keyboard hides
       setTimeout(() => {
         if (scrollViewRef.current) {
-          scrollViewRef.current.scrollTo({
+        scrollViewRef.current.scrollTo({
             y: 0,
-            animated: true,
-          })
+          animated: true,
+        })
           // Update scroll position tracking
           currentScrollY.current = 0
           lastScrollY.current = 0
           originalScrollY.current = 0
-        }
+      }
       }, 100)
     })
 
@@ -250,16 +251,33 @@ const SignUp = () => {
     Keyboard.dismiss()
 
     try {
-      await signUp({
+      const response = await signUp({
         name: name.trim(),
         email: email.trim(),
         password: password,
         role: 'contributor',
       })
       
+      // Save user to database
+      try {
+        await saveUser({
+          id: response.id,
+          user_id: response.id,
+          name: name.trim(),
+          email: email.trim(),
+          password: password, // Note: In production, don't store plain password
+          role: response.role || 'contributor',
+          email_verified: 0,
+        })
+        console.log('User saved to database successfully')
+      } catch (dbError) {
+        console.error('Error saving user to database:', dbError)
+        // Continue even if database save fails
+      }
+      
       // Success - show success modal
       setIsLoading(false)
-      setShowSuccessModal(true)
+    setShowSuccessModal(true)
     } catch (err) {
       setIsLoading(false)
       // Handle error
@@ -500,9 +518,9 @@ const SignUp = () => {
             {isLoading ? (
               <ActivityIndicator size="small" color="#1c1c1c" />
             ) : (
-              <Text className="text-xl font-satoshiMedium text-buttonText">
-                Create account
-              </Text>
+            <Text className="text-xl font-satoshiMedium text-buttonText">
+              Create account
+            </Text>
             )}
           </TouchableOpacity>
         </View>
