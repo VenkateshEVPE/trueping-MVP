@@ -1,12 +1,17 @@
 import React from 'react'
 import { View, Text } from 'react-native'
 
-const LatencyDisplay = ({ insets, ipAddress }) => {
+const LatencyDisplay = ({ insets, ipAddress, pingLatency }) => {
+  // Display ping latency if available, otherwise show default or loading
+  const displayLatency = pingLatency !== null 
+    ? (pingLatency === 999 ? '--' : pingLatency.toString())
+    : '--'
+
   return (
     <View className="absolute flex-row items-baseline justify-between w-full px-5" style={{ top: 144.44 + insets.top }}>
       {/* Large Latency Display */}
       <View className="flex-row items-baseline">
-        <Text className="text-white font-offBit101 text-[100px]">20</Text>
+        <Text className="text-white font-offBit101 text-[100px]">{displayLatency}</Text>
         <Text className="text-white font-offBit ml-[10px] text-[54px]">ms</Text>
       </View>
 

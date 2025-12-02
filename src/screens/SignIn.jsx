@@ -90,6 +90,15 @@ const SignIn = () => {
       {/* Grid pattern background with gradient overlay */}
       <GridPatternBackground />
       
+      {/* Skip button */}
+      <View className="absolute top-0 right-0 z-10" style={{ paddingTop: insets.top + 10, paddingRight: 20 }}>
+        <TouchableOpacity onPress={() => navigation.replace('tabs')}>
+          <Text className="text-base font-satoshi text-buttonBackground underline">
+            Skip
+          </Text>
+        </TouchableOpacity>
+      </View>
+      
       <ScrollView 
         className="flex-1"
         contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom }}

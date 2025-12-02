@@ -35,6 +35,13 @@ export const initDatabase = async () => {
       console.log('Database and tables already exist')
     }
 
+    // Check and migrate wallet tables if needed
+    const walletTablesExist = await checkWalletTablesExist()
+    if (!walletTablesExist) {
+      await createWalletTables()
+      console.log('Wallet tables created successfully')
+    }
+
     return db
   } catch (error) {
     console.error('Error opening database:', error)
@@ -66,6 +73,26 @@ const checkTablesExist = async () => {
 }
 
 /**
+ * Check if wallet tables exist (for migration)
+ */
+const checkWalletTablesExist = async () => {
+  try {
+    if (!db) {
+      return false
+    }
+
+    const [results] = await db.executeSql(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='wallets'",
+      []
+    )
+
+    return results.rows.length > 0
+  } catch (error) {
+    return false
+  }
+}
+
+/**
  * Create users table
  */
 const createTables = async () => {
@@ -92,6 +119,54 @@ const createTables = async () => {
     console.log('Users table created successfully')
   } catch (error) {
     console.error('Error creating tables:', error)
+    throw error
+  }
+}
+
+/**
+ * Create wallet tables (wallets and transactions)
+ */
+const createWalletTables = async () => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    // Create wallets table
+    await db.executeSql(
+      `CREATE TABLE IF NOT EXISTS wallets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        chain TEXT NOT NULL,
+        address TEXT NOT NULL,
+        name TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, chain, address)
+      );`
+    )
+
+    // Create transactions table
+    await db.executeSql(
+      `CREATE TABLE IF NOT EXISTS transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        wallet_id INTEGER NOT NULL,
+        tx_hash TEXT NOT NULL,
+        from_address TEXT NOT NULL,
+        to_address TEXT NOT NULL,
+        amount TEXT NOT NULL,
+        token_symbol TEXT DEFAULT 'ETH',
+        status TEXT DEFAULT 'pending',
+        chain TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (wallet_id) REFERENCES wallets(id) ON DELETE CASCADE,
+        UNIQUE(wallet_id, tx_hash)
+      );`
+    )
+
+    console.log('Wallet tables created successfully')
+  } catch (error) {
+    console.error('Error creating wallet tables:', error)
     throw error
   }
 }
@@ -397,6 +472,199 @@ export const clearAllData = async () => {
     console.log('All SQLite data cleared successfully')
   } catch (error) {
     console.error('Error clearing all data:', error)
+    throw error
+  }
+}
+
+// ==================== WALLET DATABASE FUNCTIONS ====================
+
+/**
+ * Save wallet to database
+ * @param {object} walletData - Wallet data { user_id, chain, address, name }
+ * @returns {Promise<number>} - Wallet ID
+ */
+export const saveWallet = async (walletData) => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    const { user_id, chain, address, name } = walletData
+
+    const insertQuery = `
+      INSERT INTO wallets (user_id, chain, address, name)
+      VALUES (?, ?, ?, ?)
+    `
+    const [insertResults] = await db.executeSql(insertQuery, [
+      user_id,
+      chain,
+      address,
+      name || `${chain} Wallet`,
+    ])
+    console.log('Wallet saved successfully')
+    return insertResults.insertId
+  } catch (error) {
+    console.error('Error saving wallet:', error)
+    throw error
+  }
+}
+
+/**
+ * Get all wallets for a user
+ * @param {number} userId - User ID
+ * @returns {Promise<Array>} - Array of wallet objects
+ */
+export const getWalletsByUserId = async (userId) => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    const [results] = await db.executeSql(
+      'SELECT * FROM wallets WHERE user_id = ? ORDER BY created_at DESC',
+      [userId]
+    )
+
+    const wallets = []
+    for (let i = 0; i < results.rows.length; i++) {
+      wallets.push(results.rows.item(i))
+    }
+    return wallets
+  } catch (error) {
+    console.error('Error getting wallets:', error)
+    return []
+  }
+}
+
+/**
+ * Get wallet by ID
+ * @param {number} walletId - Wallet ID
+ * @returns {Promise<object|null>} - Wallet object or null
+ */
+export const getWalletById = async (walletId) => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    const [results] = await db.executeSql('SELECT * FROM wallets WHERE id = ?', [walletId])
+
+    if (results.rows.length > 0) {
+      return results.rows.item(0)
+    }
+    return null
+  } catch (error) {
+    console.error('Error getting wallet by ID:', error)
+    return null
+  }
+}
+
+/**
+ * Delete wallet
+ * @param {number} walletId - Wallet ID
+ * @returns {Promise<void>}
+ */
+export const deleteWallet = async (walletId) => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    await db.executeSql('DELETE FROM wallets WHERE id = ?', [walletId])
+    console.log('Wallet deleted successfully')
+  } catch (error) {
+    console.error('Error deleting wallet:', error)
+    throw error
+  }
+}
+
+/**
+ * Save transaction to database
+ * @param {object} transactionData - Transaction data { wallet_id, tx_hash, from_address, to_address, amount, token_symbol, status, chain }
+ * @returns {Promise<number>} - Transaction ID
+ */
+export const saveTransaction = async (transactionData) => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    const {
+      wallet_id,
+      tx_hash,
+      from_address,
+      to_address,
+      amount,
+      token_symbol = 'ETH',
+      status = 'pending',
+      chain,
+    } = transactionData
+
+    const insertQuery = `
+      INSERT OR IGNORE INTO transactions (wallet_id, tx_hash, from_address, to_address, amount, token_symbol, status, chain)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `
+    const [insertResults] = await db.executeSql(insertQuery, [
+      wallet_id,
+      tx_hash,
+      from_address,
+      to_address,
+      amount,
+      token_symbol,
+      status,
+      chain,
+    ])
+    console.log('Transaction saved successfully')
+    return insertResults.insertId
+  } catch (error) {
+    console.error('Error saving transaction:', error)
+    throw error
+  }
+}
+
+/**
+ * Get transaction history for a wallet
+ * @param {number} walletId - Wallet ID
+ * @returns {Promise<Array>} - Array of transaction objects
+ */
+export const getTransactionsByWalletId = async (walletId) => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    const [results] = await db.executeSql(
+      'SELECT * FROM transactions WHERE wallet_id = ? ORDER BY created_at DESC',
+      [walletId]
+    )
+
+    const transactions = []
+    for (let i = 0; i < results.rows.length; i++) {
+      transactions.push(results.rows.item(i))
+    }
+    return transactions
+  } catch (error) {
+    console.error('Error getting transactions:', error)
+    return []
+  }
+}
+
+/**
+ * Update transaction status
+ * @param {string} txHash - Transaction hash
+ * @param {string} status - New status ('pending', 'confirmed', 'failed')
+ * @returns {Promise<void>}
+ */
+export const updateTransactionStatus = async (txHash, status) => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    await db.executeSql('UPDATE transactions SET status = ? WHERE tx_hash = ?', [status, txHash])
+    console.log('Transaction status updated')
+  } catch (error) {
+    console.error('Error updating transaction status:', error)
     throw error
   }
 }

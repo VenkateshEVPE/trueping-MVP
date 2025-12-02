@@ -1,6 +1,6 @@
 /* eslint-disable react-native/no-inline-styles */
-import { View, ScrollView, Dimensions, Animated } from 'react-native'
-import React, { useRef, useState, useEffect } from 'react'
+import { View, ScrollView, Dimensions, Animated, Alert } from 'react-native'
+import React, { useRef, useState, useEffect, useCallback } from 'react'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNetInfo } from '@react-native-community/netinfo'
 import GridPatternBackground from '../../components/GridPatternBackground'
@@ -21,6 +21,17 @@ import BottomGradient from '../../components/home/BottomGradient'
 import { fetchDeviceInfo } from '../../utils/deviceInfo'
 import { initializeGaugeAngle, createGaugePanResponder } from '../../utils/gaugeUtils'
 import { startPerformanceMonitoring } from '../../utils/performanceStats'
+import { startLivePing } from '../../utils/pingUtils'
+
+// Services
+import {
+  startBackgroundService,
+  stopBackgroundService,
+  isBackgroundServiceRunning,
+  getLatestLocation,
+  getLatestNetworkInfo,
+  getLatestTrafficStats,
+} from '../../services/BackgroundLocationService'
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window')
 const VIDEO_HEIGHT = SCREEN_HEIGHT / 1.7
@@ -45,6 +56,15 @@ const Home = () => {
     cpuUsage: '0%',
     ramUsage: '0%',
   })
+
+  // Ping latency state
+  const [pingLatency, setPingLatency] = useState(null) // null means not started yet
+
+  // Background service state
+  const [isBackgroundServiceActive, setIsBackgroundServiceActive] = useState(false)
+  const [backgroundLocation, setBackgroundLocation] = useState(null)
+  const [backgroundNetworkInfo, setBackgroundNetworkInfo] = useState(null)
+  const [backgroundTrafficStats, setBackgroundTrafficStats] = useState(null)
 
   // Initialize angle based on timer value
   useEffect(() => {
@@ -86,6 +106,72 @@ const Home = () => {
     return cleanup
   }, [])
 
+  // Start live ping monitoring
+  useEffect(() => {
+    console.log('🏓 Starting live ping monitoring...')
+    const cleanup = startLivePing((latency) => {
+      setPingLatency(latency)
+    })
+
+    // Cleanup on unmount
+    return cleanup
+  }, [])
+
+  // Check background service status on mount
+  useEffect(() => {
+    const checkServiceStatus = async () => {
+      try {
+        const isRunning = await isBackgroundServiceRunning()
+        setIsBackgroundServiceActive(isRunning)
+        console.log('📍 Background service status:', isRunning)
+      } catch (error) {
+        console.error('Error checking background service status:', error)
+      }
+    }
+    checkServiceStatus()
+  }, [])
+
+  // Update background data in UI periodically when service is active
+  useEffect(() => {
+    if (isBackgroundServiceActive) {
+      const updateBackgroundData = () => {
+        const bgLocation = getLatestLocation()
+        const bgNetwork = getLatestNetworkInfo()
+        const bgTraffic = getLatestTrafficStats()
+
+        if (bgLocation) {
+          setBackgroundLocation(bgLocation)
+          console.log('📍 Background Location Update:', bgLocation)
+        }
+        if (bgNetwork) {
+          setBackgroundNetworkInfo(bgNetwork)
+          console.log('📡 Background Network Update:', bgNetwork)
+        }
+        if (bgTraffic) {
+          setBackgroundTrafficStats(bgTraffic)
+          console.log('📊 Background Traffic Update:', bgTraffic)
+        }
+      }
+
+      // Update immediately
+      updateBackgroundData()
+
+      // Set up interval to update every 2 seconds
+      const interval = setInterval(updateBackgroundData, 2000)
+
+      return () => {
+        if (interval) {
+          clearInterval(interval)
+        }
+      }
+    }
+  }, [isBackgroundServiceActive])
+
+  // Expose handlers for potential UI controls (can be used later)
+  // These are available but not currently used in UI
+  // You can add buttons to start/stop background service if needed
+  // handleStartBackgroundService and handleStopBackgroundService are ready to use
+
   // Create PanResponder for gauge rotation
   const panResponder = useRef(
     createGaugePanResponder({
@@ -109,6 +195,36 @@ const Home = () => {
   const onLoad = () => {
     console.log('Video loaded successfully')
   }
+
+  // Background service handlers
+  const handleStartBackgroundService = useCallback(async () => {
+    try {
+      const started = await startBackgroundService()
+      if (started) {
+        setIsBackgroundServiceActive(true)
+        Alert.alert('Success', 'Background tracking started successfully!')
+      }
+    } catch (error) {
+      console.error('Failed to start background service:', error)
+      Alert.alert('Error', `Failed to start background service: ${error.message}`)
+    }
+  }, [])
+
+  const handleStopBackgroundService = useCallback(async () => {
+    try {
+      const stopped = await stopBackgroundService()
+      if (stopped) {
+        setIsBackgroundServiceActive(false)
+        setBackgroundLocation(null)
+        setBackgroundNetworkInfo(null)
+        setBackgroundTrafficStats(null)
+        Alert.alert('Success', 'Background tracking stopped.')
+      }
+    } catch (error) {
+      console.error('Failed to stop background service:', error)
+      Alert.alert('Error', `Failed to stop background service: ${error.message}`)
+    }
+  }, [])
 
   return (
     <View className="flex-1 bg-background dark:bg-black">
@@ -139,7 +255,11 @@ const Home = () => {
           <StatusHeader insets={insets} />
 
           {/* Large Latency Display and IP Address */}
-          <LatencyDisplay insets={insets} ipAddress={deviceInfo.ipAddress} />
+          <LatencyDisplay 
+            insets={insets} 
+            ipAddress={deviceInfo.ipAddress}
+            pingLatency={pingLatency}
+          />
 
           {/* Metrics Container */}
           <MetricsBox insets={insets} />
