@@ -40,7 +40,7 @@ const Home = () => {
   const insets = useSafeAreaInsets()
   const [isChargingToggleOn, setIsChargingToggleOn] = useState(true)
   const [selectedNetwork, setSelectedNetwork] = useState('wifi')
-  const [timerMinutes, setTimerMinutes] = useState(15) // Timer value in minutes (0-45)
+  const [timerMinutes, setTimerMinutes] = useState(0) // Timer value in minutes (0-45) - always start at 0
   const rotateAnim = useRef(new Animated.Value(0)).current
   const angleRef = useRef(0) // Track current angle in degrees
   const lastAngleRef = useRef(0) // Track last touch angle for incremental rotation
@@ -66,9 +66,11 @@ const Home = () => {
   const [backgroundNetworkInfo, setBackgroundNetworkInfo] = useState(null)
   const [backgroundTrafficStats, setBackgroundTrafficStats] = useState(null)
 
-  // Initialize angle based on timer value
+  // Initialize angle - always start at 0 (270 degrees position)
   useEffect(() => {
-    const { minutes } = initializeGaugeAngle(timerMinutes, angleRef, rotateAnim, lastAnimatedDotRef)
+    // Always initialize to 0 minutes, which positions 0 at 270 degrees
+    const initialMinutes = 0
+    const { minutes } = initializeGaugeAngle(initialMinutes, angleRef, rotateAnim, lastAnimatedDotRef)
     setTimerMinutes(minutes)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -112,7 +114,7 @@ const Home = () => {
     const cleanup = startLivePing((latency) => {
       setPingLatency(latency)
     })
-
+        
     // Cleanup on unmount
     return cleanup
   }, [])
@@ -151,8 +153,8 @@ const Home = () => {
           setBackgroundTrafficStats(bgTraffic)
           console.log('📊 Background Traffic Update:', bgTraffic)
         }
-      }
-
+            }
+            
       // Update immediately
       updateBackgroundData()
 
@@ -166,7 +168,7 @@ const Home = () => {
       }
     }
   }, [isBackgroundServiceActive])
-
+              
   // Expose handlers for potential UI controls (can be used later)
   // These are available but not currently used in UI
   // You can add buttons to start/stop background service if needed
@@ -225,33 +227,34 @@ const Home = () => {
       Alert.alert('Error', `Failed to stop background service: ${error.message}`)
     }
   }, [])
-
+ 
   return (
     <View className="flex-1 bg-background dark:bg-black">
       {/* Grid Pattern Background */}
       <GridPatternBackground />
-
-      <ScrollView
+      
+      <ScrollView 
         className="flex-1"
-        contentContainerStyle={{
+        contentContainerStyle={{ 
           paddingBottom: 200,
           minHeight: Math.max(VIDEO_HEIGHT + insets.top, 1129.36 + 170 + insets.top + 200),
         }}
         showsVerticalScrollIndicator={false}
         scrollEnabled={true}
         nestedScrollEnabled={true}
+        scrollEventThrottle={16}
       >
         {/* Video background - scrollable */}
         <VideoBackground
           insets={insets}
-          onBuffer={onBuffer}
-          onError={onError}
-          onLoad={onLoad}
+            onBuffer={onBuffer}
+            onError={onError}
+            onLoad={onLoad}
         />
 
-        {/* Content overlay on video */}
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'box-none' }}>
-          {/* Status Container */}
+          {/* Content overlay on video */}
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'box-none' }}>
+        {/* Status Container */}
           <StatusHeader insets={insets} />
 
           {/* Large Latency Display and IP Address */}
@@ -261,10 +264,10 @@ const Home = () => {
             pingLatency={pingLatency}
           />
 
-          {/* Metrics Container */}
+        {/* Metrics Container */}
           <MetricsBox insets={insets} />
 
-          {/* IP Latency Proofs Container */}
+        {/* IP Latency Proofs Container */}
           <IPLatencyProofs 
             insets={insets} 
             deviceId={deviceInfo.deviceId}
@@ -272,7 +275,7 @@ const Home = () => {
             ramUsage={deviceInfo.ramUsage}
           />
 
-          {/* Left Panel - Proof Interval */}
+        {/* Left Panel - Proof Interval */}
           <LeftPanel
             insets={insets}
             isChargingToggleOn={isChargingToggleOn}
@@ -281,7 +284,7 @@ const Home = () => {
             setSelectedNetwork={setSelectedNetwork}
           />
 
-          {/* Right Panel - Circular Gauge */}
+        {/* Right Panel - Circular Gauge */}
           <CircularGauge
             insets={insets}
             rotateAnim={rotateAnim}
@@ -289,14 +292,14 @@ const Home = () => {
             timerMinutes={timerMinutes}
           />
 
-          {/* Network Pulse Graph */}
+        {/* Network Pulse Graph */}
           <NetworkPulseGraph insets={insets} />
 
-          {/* Performance Graph */}
+        {/* Performance Graph */}
           <PerformanceGraph insets={insets} />
-        </View>
+        </View>    
       </ScrollView>
-
+      
       {/* Bottom screen gradient */}
       <BottomGradient />
     </View>
