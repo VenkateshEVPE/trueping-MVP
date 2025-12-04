@@ -9,6 +9,7 @@ import {
   RefreshControl,
 } from 'react-native'
 import React, { useState, useEffect, useCallback } from 'react'
+import Clipboard from '@react-native-clipboard/clipboard'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import GridPatternBackground from '../../components/GridPatternBackground'
 import { getCurrentUser } from '../../database/database'
@@ -329,12 +330,14 @@ const Wallet = () => {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => {
-                  setShowQRModal(false)
-                  setSelectedWallet(null)
+                  if (selectedWallet?.address) {
+                    Clipboard.setString(selectedWallet.address)
+                    Alert.alert('Success', 'Address copied to clipboard')
+                  }
                 }}
                 className="flex-1 bg-[#1a1a1a] border border-white/20 rounded-lg p-3"
               >
-                <Text className="text-white font-satoshi text-center">Close</Text>
+                <Text className="text-white font-satoshi text-center">Copy</Text>
               </TouchableOpacity>
             </View>
           </View>

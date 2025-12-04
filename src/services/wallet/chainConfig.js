@@ -107,22 +107,22 @@ export const CHAIN_CONFIGS = {
   [CHAINS.SOLANA]: {
     name: 'Solana',
     chainId: null, // Solana doesn't use chain IDs
-    rpcUrl: 'https://api.devnet.solana.com', // Devnet RPC endpoint
+    rpcUrl: 'https://api.mainnet-beta.solana.com', // Mainnet RPC endpoint
     nativeCurrency: {
       name: 'SOL',
       symbol: 'SOL',
       decimals: 9,
     },
-    blockExplorer: 'https://solscan.io/?cluster=devnet',
+    blockExplorer: 'https://solscan.io',
     tokens: {
       USDC: {
-        address: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU', // Solana Devnet USDC mint address
+        address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // Solana Mainnet USDC mint address
         symbol: 'USDC',
         decimals: 6,
         name: 'USD Coin',
       },
       USDT: {
-        address: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', // Solana Devnet USDT mint address (same as mainnet)
+        address: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', // Solana Mainnet USDT mint address
         symbol: 'USDT',
         decimals: 6,
         name: 'Tether USD',
