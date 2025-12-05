@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles */
-import { View, ScrollView, Dimensions, Animated, Alert } from 'react-native'
+import { View, ScrollView, Dimensions, Animated, Alert, Text } from 'react-native'
 import React, { useRef, useState, useEffect, useCallback } from 'react'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNetInfo } from '@react-native-community/netinfo'
@@ -36,6 +36,45 @@ import {
 const { height: SCREEN_HEIGHT } = Dimensions.get('window')
 const VIDEO_HEIGHT = SCREEN_HEIGHT / 1.7
 
+// Terminal loading lines for Home
+const homeLoadingLines = [
+  { prefix: 'root@trueping:~$ ', text: 'initializing system...', delay: 150 },
+  { prefix: '', text: '[OK] Loading core modules', delay: 100 },
+  { prefix: '', text: '[OK] Establishing secure connection', delay: 100 },
+  { prefix: '', text: '[OK] Network protocols initialized', delay: 100 },
+  { prefix: '', text: '[OK] Security layer activated', delay: 100 },
+  { prefix: '', text: '[OK] Encryption enabled', delay: 100 },
+  { prefix: 'root@trueping:~$ ', text: 'initializing network...', delay: 150 },
+  { prefix: '', text: '[OK] Loading device information', delay: 100 },
+  { prefix: '', text: '[OK] Establishing network connection', delay: 100 },
+  { prefix: '', text: '[OK] Network interface configured', delay: 100 },
+  { prefix: '', text: '[OK] Connection established', delay: 100 },
+  { prefix: 'root@trueping:~$ ', text: 'scanning network...', delay: 150 },
+  { prefix: '', text: '> Analyzing network topology', delay: 80 },
+  { prefix: '', text: '> Target acquired', delay: 80 },
+  { prefix: '', text: '> Firewall bypassed', delay: 80 },
+  { prefix: '', text: '> Access granted', delay: 80 },
+  { prefix: '', text: '> Connection established', delay: 80 },
+  { prefix: 'root@trueping:~$ ', text: 'starting services...', delay: 150 },
+  { prefix: '', text: '[OK] Starting performance monitoring', delay: 100 },
+  { prefix: '', text: '[OK] Initializing ping service', delay: 100 },
+  { prefix: '', text: '[OK] Loading monitoring tools', delay: 100 },
+  { prefix: '', text: '[OK] Service layer ready', delay: 100 },
+  { prefix: 'root@trueping:~$ ', text: 'running diagnostics...', delay: 150 },
+  { prefix: '', text: '> CPU: OK | Memory: OK | Network: OK', delay: 100 },
+  { prefix: '', text: '> All systems operational', delay: 100 },
+  { prefix: 'root@trueping:~$ ', text: 'verifying security...', delay: 150 },
+  { prefix: '', text: '> SSL certificate validated', delay: 80 },
+  { prefix: '', text: '> Authentication successful', delay: 80 },
+  { prefix: '', text: '> Security check passed', delay: 80 },
+  { prefix: 'root@trueping:~$ ', text: 'launching trueping...', delay: 150 },
+  { prefix: '', text: '> Loading application modules', delay: 80 },
+  { prefix: '', text: '> Initializing user interface', delay: 80 },
+  { prefix: '', text: '> Preparing data layer', delay: 80 },
+  { prefix: '', text: '████████████████████████ 100%', delay: 100 },
+  { prefix: '', text: 'System ready.', delay: 150 },
+]
+
 const Home = () => {
   const insets = useSafeAreaInsets()
   const [isChargingToggleOn, setIsChargingToggleOn] = useState(true)
@@ -66,6 +105,16 @@ const Home = () => {
   const [backgroundNetworkInfo, setBackgroundNetworkInfo] = useState(null)
   const [backgroundTrafficStats, setBackgroundTrafficStats] = useState(null)
 
+  // Loading state
+  const [isLoading, setIsLoading] = useState(true)
+  const [displayedText, setDisplayedText] = useState('')
+  const [currentLineIndex, setCurrentLineIndex] = useState(0)
+  const [hasVideoError, setHasVideoError] = useState(false)
+  const fadeAnim = useRef(new Animated.Value(0)).current
+  const cursorOpacity = useRef(new Animated.Value(1)).current
+  const loadingStartTime = useRef(Date.now())
+  const [dataLoaded, setDataLoaded] = useState(false)
+
   // Initialize angle - always start at 0 (270 degrees position)
   useEffect(() => {
     // Always initialize to 0 minutes, which positions 0 at 270 degrees
@@ -75,6 +124,61 @@ const Home = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Terminal animation effects
+  useEffect(() => {
+    if (!isLoading) return
+
+    // Fade in animation
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start()
+
+    // Cursor blink animation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(cursorOpacity, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(cursorOpacity, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start()
+  }, [isLoading, fadeAnim, cursorOpacity])
+
+  useEffect(() => {
+    if (!isLoading || currentLineIndex >= homeLoadingLines.length) {
+      return
+    }
+
+    // Reset displayed text when starting a new line
+    setDisplayedText('')
+    
+    const currentLine = homeLoadingLines[currentLineIndex]
+    const fullText = currentLine.prefix + currentLine.text
+    let charIndex = 0
+
+    const typeInterval = setInterval(() => {
+      if (charIndex <= fullText.length) {
+        setDisplayedText(fullText.substring(0, charIndex))
+        charIndex++
+      } else {
+        clearInterval(typeInterval)
+        setTimeout(() => {
+          setCurrentLineIndex(prev => prev + 1)
+        }, currentLine.delay)
+      }
+    }, 5)
+
+    return () => clearInterval(typeInterval)
+  }, [currentLineIndex, isLoading])
+
   // Fetch device information
   useEffect(() => {
     const loadDeviceInfo = async () => {
@@ -83,11 +187,46 @@ const Home = () => {
         ...prev,
         ...info,
       }))
+      // Mark data as loaded
+      setDataLoaded(true)
     }
 
     loadDeviceInfo()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [netInfoState?.details?.ipAddress])
+
+  // Ensure loading screen shows for at least 1 second
+  useEffect(() => {
+    if (!dataLoaded) return
+
+    const checkMinimumTime = () => {
+      const elapsed = Date.now() - loadingStartTime.current
+      const minimumTime = 5000 // 5 seconds in milliseconds
+
+      if (elapsed >= minimumTime) {
+        setIsLoading(false)
+      } else {
+        // Wait for remaining time
+        setTimeout(() => {
+          setIsLoading(false)
+        }, minimumTime - elapsed)
+      }
+    }
+
+    checkMinimumTime()
+  }, [dataLoaded])
+
+  // Render terminal loading screen
+  const renderTerminalLines = () => {
+    return homeLoadingLines.slice(0, currentLineIndex).map((line, index) => {
+      const fullLine = line.prefix + line.text
+      return (
+        <Text key={index} style={{ fontSize: 14, lineHeight: 20, fontFamily: 'monospace', color: '#E65300' }}>
+          {fullLine}
+        </Text>
+      )
+    })
+  }
 
   // Start continuous performance monitoring for CPU and RAM
   useEffect(() => {
@@ -192,6 +331,8 @@ const Home = () => {
 
   const onError = (error) => {
     console.error('Video error:', error)
+    // Set error state to hide video and show fallback
+    setHasVideoError(true)
   }
 
   const onLoad = () => {
@@ -227,6 +368,40 @@ const Home = () => {
       Alert.alert('Error', `Failed to stop background service: ${error.message}`)
     }
   }, [])
+
+  // Show loading screen
+  if (isLoading) {
+    return (
+      <View className="flex-1 bg-black">
+        <Animated.View 
+          className="flex-1 justify-between"
+          style={{ opacity: fadeAnim, paddingTop: insets.top, paddingBottom: insets.bottom }}
+        >
+          {/* Terminal content */}
+          <View style={{ paddingHorizontal: 15, paddingTop: 15, paddingBottom: 15, flex: 1, backgroundColor: '#0a0a0a' }}>
+            {renderTerminalLines()}
+            {currentLineIndex < homeLoadingLines.length && (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: 'monospace', color: '#E65300' }}>
+                  {displayedText}
+                </Text>
+                <Animated.Text 
+                  style={{ 
+                    fontSize: 14, 
+                    fontFamily: 'monospace', 
+                    color: '#E65300',
+                    opacity: cursorOpacity 
+                  }}
+                >
+                  ▊
+                </Animated.Text>
+              </View>
+            )}
+          </View>
+        </Animated.View>
+      </View>
+    )
+  }
  
   return (
     <View className="flex-1 bg-background dark:bg-black">
@@ -245,12 +420,21 @@ const Home = () => {
         scrollEventThrottle={16}
       >
         {/* Video background - scrollable */}
-        <VideoBackground
-          insets={insets}
+        {!hasVideoError ? (
+          <VideoBackground
+            insets={insets}
             onBuffer={onBuffer}
             onError={onError}
             onLoad={onLoad}
-        />
+          />
+        ) : (
+          <View style={{ 
+            position: 'relative', 
+            height: VIDEO_HEIGHT, 
+            marginTop: insets.top,
+            backgroundColor: '#000000'
+          }} />
+        )}
 
           {/* Content overlay on video */}
           <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'box-none' }}>

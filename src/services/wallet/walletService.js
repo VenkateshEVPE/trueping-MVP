@@ -10,9 +10,95 @@ import { storePrivateKey, deletePrivateKey } from './keychainService'
 import { getChainConfig } from './chainConfig'
 
 /**
+ * Create wallets on all supported chains with the same mnemonic
+ * @param {number} userId - User ID
+ * @param {string} name - Wallet name
+ * @returns {Promise<object>} - Object with mnemonic and created wallets
+ */
+export const createWalletsOnAllChains = async (userId, name) => {
+  try {
+    // Generate mnemonic phrase (shared across all chains)
+    const mnemonic = bip39.generateMnemonic()
+    
+    // Validate mnemonic
+    if (!bip39.validateMnemonic(mnemonic)) {
+      throw new Error('Invalid mnemonic generated')
+    }
+
+    const createdWallets = []
+    const allChains = Object.values(CHAINS)
+
+    // Create wallet on each chain
+    for (const chain of allChains) {
+      try {
+        const chainConfig = getChainConfig(chain)
+        if (!chainConfig) {
+          console.warn(`Skipping unsupported chain: ${chain}`)
+          continue
+        }
+
+        let address
+        let privateKey
+
+        // Handle Solana differently from EVM chains
+        if (chain === CHAINS.SOLANA) {
+          // Solana uses BIP44 path m/44'/501'/0'/0'
+          const seed = await bip39.mnemonicToSeed(mnemonic)
+          const derivedSeed = derivePath("m/44'/501'/0'/0'", seed.toString('hex')).key
+          const keypair = Keypair.fromSeed(derivedSeed)
+          address = keypair.publicKey.toBase58()
+          privateKey = Buffer.from(keypair.secretKey).toString('hex')
+        } else {
+          // EVM chains (Ethereum, BSC) - same mnemonic generates same address
+          const wallet = ethers.Wallet.fromPhrase(mnemonic)
+          address = wallet.address
+          privateKey = wallet.privateKey
+        }
+
+        // Save wallet to database
+        const walletId = await saveWallet({
+          user_id: userId,
+          chain: chain,
+          address: address,
+          name: name || `${chainConfig.name} Wallet`,
+        })
+
+        // Store private key securely in keychain
+        await storePrivateKey(walletId, privateKey)
+
+        createdWallets.push({
+          id: walletId,
+          userId: userId,
+          chain: chain,
+          address: address,
+          name: name || `${chainConfig.name} Wallet`,
+        })
+
+        console.log(`Wallet created successfully: ${address} on ${chain}`)
+      } catch (error) {
+        console.error(`Error creating wallet on ${chain}:`, error)
+        // Continue with other chains even if one fails
+      }
+    }
+
+    if (createdWallets.length === 0) {
+      throw new Error('Failed to create wallets on any chain')
+    }
+
+    return {
+      mnemonic: mnemonic, // Return mnemonic only once during creation
+      wallets: createdWallets,
+    }
+  } catch (error) {
+    console.error('Error creating wallets on all chains:', error)
+    throw error
+  }
+}
+
+/**
  * Create a new wallet
  * @param {number} userId - User ID
- * @param {string} chain - Chain identifier (ethereum, polygon, bsc)
+ * @param {string} chain - Chain identifier (ethereum, bsc, solana)
  * @param {string} name - Wallet name (optional)
  * @returns {Promise<object>} - Wallet object with mnemonic
  */
@@ -44,7 +130,7 @@ export const createWallet = async (userId, chain, name) => {
       address = keypair.publicKey.toBase58()
       privateKey = Buffer.from(keypair.secretKey).toString('hex')
     } else {
-      // EVM chains (Ethereum, Polygon, BSC)
+      // EVM chains (Ethereum, BSC)
       const wallet = ethers.Wallet.fromPhrase(mnemonic)
       address = wallet.address
       privateKey = wallet.privateKey

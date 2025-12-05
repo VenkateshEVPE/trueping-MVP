@@ -5,7 +5,6 @@
 
 export const CHAINS = {
   ETHEREUM: 'ethereum',
-  POLYGON: 'polygon',
   BSC: 'bsc',
   SOLANA: 'solana',
 }
@@ -36,37 +35,6 @@ export const CHAIN_CONFIGS = {
       },
       DAI: {
         address: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
-        symbol: 'DAI',
-        decimals: 18,
-        name: 'Dai Stablecoin',
-      },
-    },
-  },
-  [CHAINS.POLYGON]: {
-    name: 'Polygon',
-    chainId: 137,
-    rpcUrl: 'https://rpc.ankr.com/polygon', // Reliable public RPC endpoint
-    nativeCurrency: {
-      name: 'MATIC',
-      symbol: 'MATIC',
-      decimals: 18,
-    },
-    blockExplorer: 'https://polygonscan.com',
-    tokens: {
-      USDT: {
-        address: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F',
-        symbol: 'USDT',
-        decimals: 6,
-        name: 'Tether USD',
-      },
-      USDC: {
-        address: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
-        symbol: 'USDC',
-        decimals: 6,
-        name: 'USD Coin',
-      },
-      DAI: {
-        address: '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063',
         symbol: 'DAI',
         decimals: 18,
         name: 'Dai Stablecoin',

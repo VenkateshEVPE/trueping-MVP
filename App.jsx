@@ -1,5 +1,5 @@
 import './global.css';
-import { StatusBar, View, ActivityIndicator } from 'react-native';
+import { StatusBar, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -54,11 +54,10 @@ const AppContent = () => {
     checkAuthStatus()
   }, [])
   
-  // Show loading indicator while checking auth status
   if (isLoading) {
     return (
-      <View className="flex-1 justify-center items-center bg-black">
-        <ActivityIndicator size="large" color="#e65300" />
+      <View style={{ flex: 1, backgroundColor: '#000000' }}>
+        <StatusBar barStyle="light-content" backgroundColor="#000000" />
       </View>
     )
   }

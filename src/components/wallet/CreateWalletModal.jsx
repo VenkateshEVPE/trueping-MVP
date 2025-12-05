@@ -3,7 +3,6 @@ import { View, Text, TouchableOpacity, Modal, TextInput, ActivityIndicator, Aler
 import { CHAINS, getChainConfig } from '../../services/wallet/chainConfig'
 
 const CreateWalletModal = ({ visible, onClose, onCreate }) => {
-  const [chain, setChain] = useState(CHAINS.ETHEREUM)
   const [name, setName] = useState('')
   const [isCreating, setIsCreating] = useState(false)
 
@@ -15,9 +14,8 @@ const CreateWalletModal = ({ visible, onClose, onCreate }) => {
 
     setIsCreating(true)
     try {
-      await onCreate(chain, name.trim())
+      await onCreate(name.trim())
       setName('')
-      setChain(CHAINS.ETHEREUM)
     } catch (error) {
       Alert.alert('Error', error.message || 'Failed to create wallet')
     } finally {
@@ -48,31 +46,26 @@ const CreateWalletModal = ({ visible, onClose, onCreate }) => {
           </View>
 
           <View className="mb-4">
-            <Text className="text-white font-satoshi text-sm mb-2">Blockchain Network</Text>
+            <Text className="text-white font-satoshi text-sm mb-2">Supported Networks</Text>
             <View className="flex-row flex-wrap gap-2">
               {Object.values(CHAINS).map((chainOption) => {
                 const config = getChainConfig(chainOption)
-                const isSelected = chain === chainOption
                 return (
-                  <TouchableOpacity
+                  <View
                     key={chainOption}
-                    onPress={() => setChain(chainOption)}
-                    className={`border rounded-lg p-3 ${
-                      isSelected ? 'border-[#FF6B35] bg-[#FF6B35]/20' : 'border-white/20'
-                    }`}
+                    className="border border-white/20 rounded-lg p-3"
                     style={{ minWidth: '30%' }}
                   >
-                    <Text
-                      className={`font-satoshi text-center ${
-                        isSelected ? 'text-[#FF6B35]' : 'text-white'
-                      }`}
-                    >
+                    <Text className="font-satoshi text-center text-white">
                       {config?.name || chainOption}
                     </Text>
-                  </TouchableOpacity>
+                  </View>
                 )
               })}
             </View>
+            <Text className="text-[#9CA3AF] font-satoshi text-xs mt-2">
+              Wallets will be created on all supported networks
+            </Text>
           </View>
 
           <TouchableOpacity

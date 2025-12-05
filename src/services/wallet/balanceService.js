@@ -67,22 +67,6 @@ export const getBalance = async (address, chain) => {
         const formattedBalance = ethers.formatEther(balance)
         return formattedBalance
       } catch (providerError) {
-        // Try fallback RPC if main one fails
-        if (chain === CHAINS.POLYGON) {
-          console.warn('Primary Polygon RPC failed, trying fallback...')
-          const fallbackProvider = new ethers.JsonRpcProvider('https://polygon-rpc.com', {
-            name: 'polygon',
-            chainId: 137,
-          })
-          const balance = await Promise.race([
-            fallbackProvider.getBalance(address),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Fallback request timeout')), 10000)
-            ),
-          ])
-          const formattedBalance = ethers.formatEther(balance)
-          return formattedBalance
-        }
         throw providerError
       }
     }

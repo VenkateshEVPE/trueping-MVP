@@ -11,14 +11,36 @@ const VideoBackground = ({ insets, onBuffer, onError, onLoad }) => {
   const videoRef = useRef(null)
   const background = require('../../../assets/videos/20251027-0446-31.7698841.mp4')
 
+  const handleError = (error) => {
+    console.error('VideoBackground error:', error)
+    // Call parent error handler
+    if (onError) {
+      onError(error)
+    }
+  }
+
+  const handleLoad = () => {
+    // Call parent load handler
+    if (onLoad) {
+      onLoad()
+    }
+  }
+
+  const handleBuffer = (data) => {
+    // Call parent buffer handler
+    if (onBuffer) {
+      onBuffer(data)
+    }
+  }
+
   return (
     <View style={{ position: 'relative', height: VIDEO_HEIGHT, marginTop: insets.top }}>
       <Video
         source={background}
         ref={videoRef}
-        onBuffer={onBuffer}
-        onError={onError}
-        onLoad={onLoad}
+        onBuffer={handleBuffer}
+        onError={handleError}
+        onLoad={handleLoad}
         style={styles.backgroundVideo}
         resizeMode="cover"
         repeat

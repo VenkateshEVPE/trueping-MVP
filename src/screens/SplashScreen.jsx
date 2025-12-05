@@ -98,7 +98,7 @@ const SplashScreen = () => {
     return terminalLines.slice(0, currentLineIndex).map((line, index) => {
       const fullLine = line.prefix + line.text
       return (
-        <Text key={index} className="text-sm leading-5 font-mono text-terminalText dark:text-[#a0a0a0]">
+        <Text key={index} style={{ fontSize: 14, lineHeight: 20, fontFamily: 'monospace', color: '#E65300' }}>
           {fullLine}
         </Text>
       )
@@ -116,10 +116,14 @@ const SplashScreen = () => {
           {renderDisplayedLines()}
           {currentLineIndex < terminalLines.length && (
             <View className="flex-row items-center">
-              <Text className="text-sm leading-5 font-mono text-terminalText dark:text-[#a0a0a0]">{displayedText}</Text>
+              <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: 'monospace', color: '#E65300' }}>{displayedText}</Text>
               <Animated.Text 
-                className="text-sm font-mono text-terminalText dark:text-[#a0a0a0]"
-                style={{ opacity: cursorOpacity }}
+                style={{ 
+                  fontSize: 14, 
+                  fontFamily: 'monospace', 
+                  color: '#E65300',
+                  opacity: cursorOpacity 
+                }}
               >
                 ▊
               </Animated.Text>
@@ -131,20 +135,20 @@ const SplashScreen = () => {
         <View className="items-center justify-center py-[30px] px-[15px] w-full bg-terminalContent dark:bg-[#0a0a0a]">
           <View className="items-center">
             {/* eslint-disable-next-line react-native/no-inline-styles */}
-            <Text className="text-xs leading-4 font-mono text-left text-terminalText dark:text-[#a0a0a0]" style={{ includeFontPadding: false }}>
+            <Text style={{ fontSize: 12, lineHeight: 16, fontFamily: 'monospace', color: '#E65300', includeFontPadding: false }}>
               ╔════════════════════════════╗
             </Text>
             {/* eslint-disable-next-line react-native/no-inline-styles */}
-            <Text className="text-xs leading-4 font-mono text-left text-terminalText dark:text-[#a0a0a0]" style={{ includeFontPadding: false }}>
+            <Text style={{ fontSize: 12, lineHeight: 16, fontFamily: 'monospace', color: '#E65300', includeFontPadding: false }}>
                ║        TRUEPING          ║ 
             </Text>
             {/* eslint-disable-next-line react-native/no-inline-styles */}
-            <Text className="text-xs leading-4 font-mono text-left text-terminalText dark:text-[#a0a0a0]" style={{ includeFontPadding: false }}>
+            <Text style={{ fontSize: 12, lineHeight: 16, fontFamily: 'monospace', color: '#E65300', includeFontPadding: false }}>
               ╚════════════════════════════╝
             </Text>
           </View>
           <View className="mt-[15px] items-center">
-            <Text className="text-[10px] font-mono text-center tracking-[2px] text-terminalText dark:text-[#a0a0a0]">
+            <Text style={{ fontSize: 10, fontFamily: 'monospace', textAlign: 'center', letterSpacing: 2, color: '#E65300' }}>
               [ SECURE NETWORK ACCESS ]
             </Text>
           </View>
