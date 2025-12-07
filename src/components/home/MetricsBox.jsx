@@ -2,14 +2,25 @@ import React from 'react'
 import { View, Text } from 'react-native'
 import Svg, { Path } from 'react-native-svg'
 
-const MetricsBox = ({ insets }) => {
+const MetricsBox = ({ insets, samplesCollected = 24, uptimePercent = 0, avgLatency = null }) => {
+  // Format average latency
+  const formatLatency = (latency) => {
+    if (latency === null || latency === undefined) return '--'
+    return `${Math.round(latency)}ms`
+  }
+
+  // Format uptime percentage
+  const formatUptime = (percent) => {
+    return `${Math.round(percent)}%`
+  }
+
   return (
     <View className="absolute flex-col w-full px-5" style={{ top: 272.88 + insets.top, gap: 5 }}>
       {/* Single white box containing all three values */}
       <View className="bg-[#f6f6f6] px-[15px] py-[5px] flex-row items-center justify-between rounded-[5px]">
         {/* Samples Collected */}
         <View className="flex-1 items-center">
-          <Text className="text-[14px] text-[#212322] font-offBit101Bold text-center" style={{ lineHeight: 20 }}>250</Text>
+          <Text className="text-[14px] text-[#212322] font-offBit101Bold text-center" style={{ lineHeight: 20 }}>{samplesCollected}</Text>
         </View>
 
         {/* Uptime */}
@@ -22,12 +33,12 @@ const MetricsBox = ({ insets }) => {
               fill="#14AE5C"
             />
           </Svg>
-          <Text className="text-[14px] text-[#212322] font-offBit101Bold text-center" style={{ lineHeight: 20 }}>25%</Text>
+          <Text className="text-[14px] text-[#212322] font-offBit101Bold text-center" style={{ lineHeight: 20 }}>{formatUptime(uptimePercent)}</Text>
         </View>
 
         {/* Avg Latency */}
         <View className="flex-1 items-center">
-          <Text className="text-[14px] text-[#212322] font-offBit101Bold text-center" style={{ lineHeight: 20 }}>45ms</Text>
+          <Text className="text-[14px] text-[#212322] font-offBit101Bold text-center" style={{ lineHeight: 20 }}>{formatLatency(avgLatency)}</Text>
         </View>
       </View>
 

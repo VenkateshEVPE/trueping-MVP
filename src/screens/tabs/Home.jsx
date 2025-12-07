@@ -35,6 +35,9 @@ import {
 } from '../../services/BackgroundLocationService'
 import { arePermissionsGranted } from '../../services/permissionsStorage'
 
+// Database
+import { getAppStats, getTodayUptime, getTodayAvgLatency } from '../../database/database'
+
 const { height: SCREEN_HEIGHT } = Dimensions.get('window')
 const VIDEO_HEIGHT = SCREEN_HEIGHT / 1.7
 
@@ -100,6 +103,13 @@ const Home = () => {
 
   // Ping latency state
   const [pingLatency, setPingLatency] = useState(null) // null means not started yet
+
+  // Metrics state
+  const [metrics, setMetrics] = useState({
+    samplesCollected: 0,
+    uptimePercent: 0,
+    avgLatency: null,
+  })
 
   // Background service state
   const [isBackgroundServiceActive, setIsBackgroundServiceActive] = useState(false)
@@ -196,6 +206,45 @@ const Home = () => {
     loadDeviceInfo()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [netInfoState?.details?.ipAddress])
+
+  // Fetch metrics (samples, uptime, avg latency)
+  useEffect(() => {
+    const loadMetrics = async () => {
+      try {
+        // Get app stats (includes total samples)
+        const appStats = await getAppStats()
+        
+        // Get today's uptime
+        const todayUptime = await getTodayUptime()
+        
+        // Calculate uptime percentage (assuming 24 hours = 100%)
+        const oneDayMs = 24 * 60 * 60 * 1000
+        const uptimePercent = (todayUptime.uptimeMs / oneDayMs) * 100
+        
+        // Get today's average latency
+        let avgLatency = await getTodayAvgLatency()
+        
+        // Fallback to current ping latency if no database data available
+        if (avgLatency === null && pingLatency !== null && pingLatency !== 999) {
+          avgLatency = pingLatency
+        }
+        
+        setMetrics({
+          samplesCollected: appStats.totalSamples || 0,
+          uptimePercent: Math.min(100, Math.max(0, uptimePercent)), // Clamp between 0-100
+          avgLatency: avgLatency,
+        })
+      } catch (error) {
+        console.error('❌ Error loading metrics:', error)
+      }
+    }
+
+    loadMetrics()
+    
+    // Refresh metrics every 30 seconds
+    const interval = setInterval(loadMetrics, 30000)
+    return () => clearInterval(interval)
+  }, [pingLatency]) // Re-run when pingLatency changes
 
   // Ensure loading screen shows for at least 1 second
   useEffect(() => {
@@ -509,7 +558,12 @@ const Home = () => {
           />
 
         {/* Metrics Container */}
-          <MetricsBox insets={insets} />
+          <MetricsBox 
+            insets={insets}
+            samplesCollected={metrics.samplesCollected}
+            uptimePercent={metrics.uptimePercent}
+            avgLatency={metrics.avgLatency}
+          />
 
         {/* IP Latency Proofs Container */}
           <IPLatencyProofs 

@@ -1143,11 +1143,11 @@ export const insertDeviceData = async (data) => {
     await db.executeSql(insertQuery, values)
     console.log('✅ Device data inserted successfully')
     
-    // Update total samples count
+    // Increment total samples count when a new sample is stored
     try {
-      await updateTotalSamples()
+      await incrementUploadedSamples(1)
     } catch (updateError) {
-      console.warn('⚠️ Failed to update total samples:', updateError.message)
+      console.warn('⚠️ Failed to increment total samples:', updateError.message)
       // Don't fail the insert if stats update fails
     }
     
@@ -1266,13 +1266,9 @@ export const deleteDeviceDataByIds = async (ids) => {
     await db.executeSql(query, ids)
     console.log(`✅ Deleted ${ids.length} device data records`)
     
-    // Update total samples count after deletion
-    try {
-      await updateTotalSamples()
-    } catch (updateError) {
-      console.warn('⚠️ Failed to update total samples after deletion:', updateError.message)
-      // Don't fail the delete if stats update fails
-    }
+    // Note: We don't decrement total_samples when deleting uploaded records
+    // total_samples represents all samples collected (including uploaded ones)
+    // This ensures the count persists even after samples are uploaded and deleted
     
     return true
   } catch (error) {
@@ -1598,6 +1594,33 @@ export const updateTotalSamples = async (count = null) => {
 }
 
 /**
+ * Increment uploaded samples count
+ * @param {number} count - Number of samples to increment (default: 1)
+ * @returns {Promise<boolean>} Success status
+ */
+export const incrementUploadedSamples = async (count = 1) => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    const now = Date.now()
+    await db.executeSql(
+      `UPDATE app_stats 
+       SET total_samples = total_samples + ?, last_updated = ?, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = (SELECT id FROM app_stats ORDER BY id DESC LIMIT 1)`,
+      [count, now]
+    )
+
+    console.log(`✅ Incremented uploaded samples by ${count}`)
+    return true
+  } catch (error) {
+    console.error('❌ Error incrementing uploaded samples:', error)
+    return false
+  }
+}
+
+/**
  * Get app statistics (total samples and uptime)
  * @returns {Promise<object>} App stats object
  */
@@ -1645,16 +1668,25 @@ export const getAppStats = async () => {
     const now = Date.now()
     const uptime = now - stats.app_installed_at
 
-    // Get actual count from device_data table
+    // Get actual count from device_data table (currently stored samples)
     const [countResults] = await db.executeSql(
       'SELECT COUNT(*) as count FROM device_data',
       []
     )
     const actualCount = countResults.rows.item(0).count
 
-    // Update total_samples if different
-    if (actualCount !== stats.total_samples) {
-      await updateTotalSamples(actualCount)
+    // Sync total_samples UP if actual count is higher (handles new samples or initialization)
+    // But don't sync DOWN - total_samples represents all collected samples including uploaded ones
+    let finalCount = stats.total_samples || 0
+    if (actualCount > finalCount) {
+      const updateTime = Date.now()
+      await db.executeSql(
+        `UPDATE app_stats 
+         SET total_samples = ?, last_updated = ?, updated_at = CURRENT_TIMESTAMP 
+         WHERE id = (SELECT id FROM app_stats ORDER BY id DESC LIMIT 1)`,
+        [actualCount, updateTime]
+      )
+      finalCount = actualCount
     }
 
     // Get today's uptime
@@ -1662,7 +1694,7 @@ export const getAppStats = async () => {
 
     return {
       appInstalledAt: stats.app_installed_at,
-      totalSamples: actualCount,
+      totalSamples: finalCount, // Use stored count (includes uploaded samples)
       totalUptime: uptime, // in milliseconds
       totalUptimeFormatted: formatUptime(uptime),
       todayUptime: todayUptime.uptimeMs,
@@ -1682,5 +1714,62 @@ export const getAppStats = async () => {
       todayIsActive: false,
       lastUpdated: null,
     }
+  }
+}
+
+/**
+ * Get today's average latency
+ * @returns {Promise<number|null>} Today's average latency in milliseconds, or null if no data
+ */
+export const getTodayAvgLatency = async () => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    // Get today's start timestamp (00:00:00)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const todayStart = today.getTime()
+
+    console.log('📊 Fetching today\'s average latency, timestamp >=', todayStart)
+
+    // Get average latency from today's records
+    const [results] = await db.executeSql(
+      `SELECT AVG(avg_latency) as avg_latency, COUNT(*) as count
+       FROM device_data 
+       WHERE timestamp >= ? AND avg_latency IS NOT NULL AND avg_latency > 0`,
+      [todayStart]
+    )
+
+    if (results.rows.length > 0) {
+      const row = results.rows.item(0)
+      const avgLatency = row.avg_latency
+      const count = row.count
+      
+      console.log('📊 Today\'s latency query result:', { avgLatency, count })
+      
+      if (avgLatency !== null && avgLatency !== undefined && !isNaN(avgLatency)) {
+        return avgLatency
+      }
+    }
+
+    // If no results with avg_latency, try to get from any records today (fallback)
+    const [fallbackResults] = await db.executeSql(
+      `SELECT AVG(avg_latency) as avg_latency, COUNT(*) as count
+       FROM device_data 
+       WHERE timestamp >= ?`,
+      [todayStart]
+    )
+
+    if (fallbackResults.rows.length > 0) {
+      const row = fallbackResults.rows.item(0)
+      console.log('📊 Fallback query result:', { avgLatency: row.avg_latency, count: row.count })
+    }
+
+    return null
+  } catch (error) {
+    console.error('❌ Error getting today average latency:', error)
+    return null
   }
 }

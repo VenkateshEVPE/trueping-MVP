@@ -363,6 +363,10 @@ export const uploadDeviceDataToServer = async (deviceDataRecords) => {
     // Upload proofs using the proof service
     const result = await uploadProofs(proofs)
 
+    // Note: We don't increment samplesCollected here anymore
+    // samplesCollected now represents all stored samples (incremented when stored)
+    // This ensures accurate count of collected samples
+
     // Return true if at least one proof was uploaded successfully
     return result.success
   } catch (error) {
