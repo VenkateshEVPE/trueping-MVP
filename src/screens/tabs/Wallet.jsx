@@ -803,7 +803,7 @@ const Wallet = () => {
           <View className="flex-row gap-3 mb-5">
             <TouchableOpacity
               onPress={() => setShowCreateModal(true)}
-              className="flex-1 bg-[#FF6B35] rounded-lg p-4"
+              className="flex-1 bg-[#E65300] rounded-lg p-4"
             >
               <Text className="text-white font-satoshi text-center font-bold">Create Wallet</Text>
             </TouchableOpacity>
@@ -902,7 +902,7 @@ const Wallet = () => {
 
       {/* Top Bar Switcher */}
       <View style={{
-        paddingTop: insets.top,
+        paddingTop: insets.top+20,
         paddingBottom: 10,
         paddingHorizontal: 16,
         backgroundColor: '#000000',

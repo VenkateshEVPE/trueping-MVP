@@ -472,7 +472,7 @@ const Home = () => {
         className="flex-1"
         contentContainerStyle={{ 
           paddingBottom: insets.bottom ,
-          minHeight: Math.max(VIDEO_HEIGHT + insets.top, 1129.36 + 170 + insets.top + insets.bottom + 10),
+          minHeight: Math.max(VIDEO_HEIGHT + insets.top, 1129.36 + insets.top + insets.bottom + 10),
         }}
         showsVerticalScrollIndicator={false}
         scrollEnabled={true}
@@ -540,7 +540,7 @@ const Home = () => {
           <NetworkPulseGraph insets={insets} />
 
         {/* Performance Graph */}
-          <PerformanceGraph insets={insets} />
+          {/* <PerformanceGraph insets={insets} /> */}
         </View>    
       </ScrollView>
       

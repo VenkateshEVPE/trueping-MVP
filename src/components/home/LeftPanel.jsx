@@ -7,7 +7,7 @@ const LeftPanel = ({ insets, isChargingToggleOn, setIsChargingToggleOn, selected
       {/* Proof Interval */}
       <View className="items-center" style={{ gap: 4 }}>
         <Text className="text-[16px] text-[#f6f6f6] font-satoshiMedium text-center" style={{ letterSpacing: 0.15 }}>Proof Interval</Text>
-        <Text className="text-[16px] text-[#e65300] font-offBit101Bold text-center">15 : 02</Text>
+        <Text className="text-[16px] text-[#e65300] font-offBit101Bold text-center">02 : 00</Text>
       </View>
 
       {/* Toggle */}

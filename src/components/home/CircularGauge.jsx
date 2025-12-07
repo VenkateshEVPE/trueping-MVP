@@ -149,7 +149,7 @@ const CircularGauge = ({ insets, rotateAnim, panHandlers, timerMinutes }) => {
       </View>
 
       {/* Fixed angle degree indicators at 4 positions (0°, 90°, 180°, 270°) - don't rotate */}
-      {[0, 90, 180, 270].map((deg) => {
+      {/* {[0, 90, 180, 270].map((deg) => {
         // In standard coordinates: 0°=right, 90°=bottom, 180°=left, 270°=top
         // We want 270° at bottom, so we need to shift by 180°:
         // 270° - 180° = 90° (which is bottom in standard coordinates)
@@ -172,7 +172,7 @@ const CircularGauge = ({ insets, rotateAnim, panHandlers, timerMinutes }) => {
             <Text style={styles.angleText}>{deg}°</Text>
           </View>
         )
-      })}
+      })} */}
 
       {/* Digital time display in center */}
       <View style={styles.timeDisplay}>
@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
   timeDisplay: {
     position: 'absolute',
     top: '50%',
-    left: '50%',
+    left: '47.5%',
     transform: [{ translateX: -35 }, { translateY: -14 }],
     backgroundColor: '#212322',
     paddingHorizontal: 10,
