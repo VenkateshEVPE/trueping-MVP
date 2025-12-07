@@ -42,6 +42,32 @@ export const initDatabase = async () => {
       console.log('Wallet tables created successfully')
     }
 
+    // Check and create device_data table if needed
+    const deviceDataTableExists = await checkDeviceDataTableExists()
+    if (!deviceDataTableExists) {
+      await createDeviceDataTable()
+      console.log('Device data table created successfully')
+    }
+
+    // Check and create app_stats table if needed
+    const appStatsTableExists = await checkAppStatsTableExists()
+    if (!appStatsTableExists) {
+      await createAppStatsTable()
+      console.log('App stats table created successfully')
+      // Initialize app stats on first creation
+      await initializeAppStats()
+    }
+
+    // Check and create daily_uptime table if needed
+    const dailyUptimeTableExists = await checkDailyUptimeTableExists()
+    if (!dailyUptimeTableExists) {
+      await createDailyUptimeTable()
+      console.log('Daily uptime table created successfully')
+    }
+
+    // Migrate users table to add skipped_login column if needed
+    await migrateUsersTableForSkipLogin()
+
     return db
   } catch (error) {
     console.error('Error opening database:', error)
@@ -93,6 +119,101 @@ const checkWalletTablesExist = async () => {
 }
 
 /**
+ * Check if device_data table exists
+ */
+const checkDeviceDataTableExists = async () => {
+  try {
+    if (!db) {
+      return false
+    }
+
+    const [results] = await db.executeSql(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='device_data'",
+      []
+    )
+
+    return results.rows.length > 0
+  } catch (error) {
+    return false
+  }
+}
+
+/**
+ * Check if app_stats table exists
+ */
+const checkAppStatsTableExists = async () => {
+  try {
+    if (!db) {
+      return false
+    }
+
+    const [results] = await db.executeSql(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='app_stats'",
+      []
+    )
+
+    return results.rows.length > 0
+  } catch (error) {
+    return false
+  }
+}
+
+/**
+ * Check if daily_uptime table exists
+ */
+const checkDailyUptimeTableExists = async () => {
+  try {
+    if (!db) {
+      return false
+    }
+
+    const [results] = await db.executeSql(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='daily_uptime'",
+      []
+    )
+
+    return results.rows.length > 0
+  } catch (error) {
+    return false
+  }
+}
+
+/**
+ * Migrate users table to add skipped_login column if it doesn't exist
+ */
+const migrateUsersTableForSkipLogin = async () => {
+  try {
+    if (!db) {
+      return
+    }
+
+    // Check if skipped_login column exists
+    const [results] = await db.executeSql(
+      "PRAGMA table_info(users)"
+    )
+
+    let columnExists = false
+    for (let i = 0; i < results.rows.length; i++) {
+      if (results.rows.item(i).name === 'skipped_login') {
+        columnExists = true
+        break
+      }
+    }
+
+    if (!columnExists) {
+      // Add skipped_login column
+      await db.executeSql(
+        'ALTER TABLE users ADD COLUMN skipped_login INTEGER DEFAULT 0'
+      )
+      console.log('✅ Added skipped_login column to users table')
+    }
+  } catch (error) {
+    console.error('Error migrating users table for skip login:', error)
+    // Don't throw - migration failures shouldn't break the app
+  }
+}
+
+/**
  * Create users table
  */
 const createTables = async () => {
@@ -111,6 +232,8 @@ const createTables = async () => {
         role TEXT,
         token TEXT,
         email_verified INTEGER DEFAULT 0,
+        permissions_granted INTEGER DEFAULT 0,
+        skipped_login INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );`
@@ -172,6 +295,126 @@ const createWalletTables = async () => {
 }
 
 /**
+ * Create device_data table
+ */
+const createDeviceDataTable = async () => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    await db.executeSql(
+      `CREATE TABLE IF NOT EXISTS device_data (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        device_id TEXT,
+        unique_id TEXT,
+        device_name TEXT,
+        os TEXT,
+        os_version TEXT,
+        ip_address TEXT,
+        network_type TEXT,
+        airplane_mode INTEGER DEFAULT 0,
+        internet_reachable INTEGER DEFAULT 0,
+        latitude REAL,
+        longitude REAL,
+        altitude REAL,
+        accuracy REAL,
+        upload_speed TEXT,
+        download_speed TEXT,
+        avg_latency REAL,
+        best_latency REAL,
+        server_tested TEXT,
+        timestamp INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );`
+    )
+
+    console.log('Device data table created successfully')
+  } catch (error) {
+    console.error('Error creating device data table:', error)
+    throw error
+  }
+}
+
+/**
+ * Create app_stats table
+ */
+const createAppStatsTable = async () => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    await db.executeSql(
+      `CREATE TABLE IF NOT EXISTS app_stats (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        app_installed_at INTEGER NOT NULL,
+        total_samples INTEGER DEFAULT 0,
+        last_updated INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );`
+    )
+
+    console.log('App stats table created successfully')
+  } catch (error) {
+    console.error('Error creating app stats table:', error)
+    throw error
+  }
+}
+
+/**
+ * Initialize app stats (set installed_at timestamp on first run)
+ */
+const initializeAppStats = async () => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    const now = Date.now()
+    await db.executeSql(
+      `INSERT INTO app_stats (app_installed_at, total_samples, last_updated) 
+       VALUES (?, 0, ?)`,
+      [now, now]
+    )
+
+    console.log('✅ App stats initialized with installed_at:', new Date(now).toISOString())
+  } catch (error) {
+    console.error('❌ Error initializing app stats:', error)
+    throw error
+  }
+}
+
+/**
+ * Create daily_uptime table
+ */
+const createDailyUptimeTable = async () => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    await db.executeSql(
+      `CREATE TABLE IF NOT EXISTS daily_uptime (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL UNIQUE,
+        uptime_ms INTEGER DEFAULT 0,
+        session_start INTEGER,
+        last_updated INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );`
+    )
+
+    console.log('Daily uptime table created successfully')
+  } catch (error) {
+    console.error('Error creating daily uptime table:', error)
+    throw error
+  }
+}
+
+/**
  * Get database instance
  */
 export const getDatabase = () => {
@@ -201,8 +444,13 @@ export const saveUser = async (userData) => {
       password,
       role,
       token,
-      email_verified = 0,
+      email_verified = false,
+      skipped_login = false,
     } = userData
+
+    // Convert boolean to integer for SQLite storage
+    const emailVerifiedInt = email_verified === true || email_verified === 1 ? 1 : 0
+    const skippedLoginInt = skipped_login === true || skipped_login === 1 ? 1 : 0
 
     // Check if user exists
     const [results] = await db.executeSql(
@@ -220,6 +468,7 @@ export const saveUser = async (userData) => {
             role = COALESCE(?, role),
             token = COALESCE(?, token),
             email_verified = COALESCE(?, email_verified),
+            skipped_login = COALESCE(?, skipped_login),
             updated_at = CURRENT_TIMESTAMP
         WHERE email = ?
       `
@@ -229,7 +478,8 @@ export const saveUser = async (userData) => {
         password || null,
         role || null,
         token || null,
-        email_verified,
+        emailVerifiedInt,
+        skippedLoginInt,
         email,
       ])
       console.log('User updated successfully')
@@ -237,8 +487,8 @@ export const saveUser = async (userData) => {
     } else {
       // Insert new user
       const insertQuery = `
-        INSERT INTO users (user_id, name, email, password, role, token, email_verified)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO users (user_id, name, email, password, role, token, email_verified, skipped_login)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `
       const [insertResults] = await db.executeSql(insertQuery, [
         user_id || id,
@@ -247,7 +497,8 @@ export const saveUser = async (userData) => {
         password || null,
         role || null,
         token || null,
-        email_verified,
+        emailVerifiedInt,
+        skippedLoginInt,
       ])
       console.log('User saved successfully')
       return insertResults.insertId
@@ -276,7 +527,14 @@ export const getUserByEmail = async (email) => {
     )
 
     if (results.rows.length > 0) {
-      return results.rows.item(0)
+      const user = results.rows.item(0)
+      // Convert integer to boolean for boolean columns
+      return {
+        ...user,
+        email_verified: user.email_verified === 1,
+        permissions_granted: user.permissions_granted === 1,
+        skipped_login: user.skipped_login === 1,
+      }
     } else {
       return null
     }
@@ -290,6 +548,7 @@ export const getUserByEmail = async (email) => {
  * Get user by ID
  * @param {number} id - User ID
  * @returns {Promise<object|null>} - User object or null
+ * Note: Boolean columns are converted from integer to boolean
  */
 export const getUserById = async (id) => {
   try {
@@ -304,7 +563,14 @@ export const getUserById = async (id) => {
     )
 
     if (results.rows.length > 0) {
-      return results.rows.item(0)
+      const user = results.rows.item(0)
+      // Convert integer to boolean for boolean columns
+      return {
+        ...user,
+        email_verified: user.email_verified === 1,
+        permissions_granted: user.permissions_granted === 1,
+        skipped_login: user.skipped_login === 1,
+      }
     } else {
       return null
     }
@@ -315,8 +581,9 @@ export const getUserById = async (id) => {
 }
 
 /**
- * Get current logged in user
- * @returns {Promise<object|null>} - User object with token or null
+ * Get current logged in user (including skipped login users)
+ * @returns {Promise<object|null>} - User object with token or skipped_login flag, or null
+ * Note: Boolean columns (email_verified, permissions_granted, skipped_login) are converted from integer to boolean
  */
 export const getCurrentUser = async () => {
   try {
@@ -325,13 +592,21 @@ export const getCurrentUser = async () => {
       return null
     }
 
+    // First check for users with token
     const [results] = await db.executeSql(
-      'SELECT * FROM users WHERE token IS NOT NULL AND token != "" ORDER BY updated_at DESC LIMIT 1',
+      'SELECT * FROM users WHERE (token IS NOT NULL AND token != "") OR skipped_login = 1 ORDER BY updated_at DESC LIMIT 1',
       []
     )
 
     if (results.rows.length > 0) {
-      return results.rows.item(0)
+      const user = results.rows.item(0)
+      // Convert integer to boolean for boolean columns
+      return {
+        ...user,
+        email_verified: user.email_verified === 1,
+        permissions_granted: user.permissions_granted === 1,
+        skipped_login: user.skipped_login === 1,
+      }
     } else {
       return null
     }
@@ -666,5 +941,675 @@ export const updateTransactionStatus = async (txHash, status) => {
   } catch (error) {
     console.error('Error updating transaction status:', error)
     throw error
+  }
+}
+
+// ==================== PERMISSIONS DATABASE FUNCTIONS ====================
+
+/**
+ * Check if permissions have been granted
+ * @returns {Promise<boolean>} True if permissions granted, false otherwise
+ */
+export const arePermissionsGranted = async () => {
+  try {
+    if (!db) {
+      return false
+    }
+
+    // Check if permissions_granted column exists, if not add it
+    try {
+      const [results] = await db.executeSql(
+        "SELECT permissions_granted FROM users WHERE token IS NOT NULL AND token != '' ORDER BY updated_at DESC LIMIT 1",
+        []
+      )
+
+      if (results.rows.length > 0) {
+        const user = results.rows.item(0)
+        // Convert integer to boolean
+        return user.permissions_granted === 1 || user.permissions_granted === true
+      }
+    } catch (error) {
+      // Column might not exist, try to add it
+      try {
+        await db.executeSql('ALTER TABLE users ADD COLUMN permissions_granted INTEGER DEFAULT 0', [])
+        console.log('Added permissions_granted column to users table')
+      } catch (alterError) {
+        // Column might already exist, ignore
+        console.log('Column might already exist or error:', alterError.message)
+      }
+    }
+
+    return false
+  } catch (error) {
+    console.error('Error checking permissions status:', error)
+    return false
+  }
+}
+
+/**
+ * Mark permissions as granted
+ * @returns {Promise<boolean>} Success status
+ */
+export const markPermissionsAsGranted = async () => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    // Update all users with tokens (current logged in user)
+    // Use 1 for true (SQLite stores booleans as INTEGER)
+    await db.executeSql(
+      "UPDATE users SET permissions_granted = 1, updated_at = CURRENT_TIMESTAMP WHERE token IS NOT NULL AND token != ''",
+      []
+    )
+    console.log('✅ Permissions marked as granted')
+    return true
+  } catch (error) {
+    console.error('❌ Error marking permissions as granted:', error)
+    return false
+  }
+}
+
+// ==================== DEVICE DATA DATABASE FUNCTIONS ====================
+
+/**
+ * Insert device and network data
+ * @param {Object} data - Device and network data object
+ * @returns {Promise<boolean>} Success status
+ */
+export const insertDeviceData = async (data) => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    const insertQuery = `
+      INSERT INTO device_data (
+        device_id,
+        unique_id,
+        device_name,
+        os,
+        os_version,
+        ip_address,
+        network_type,
+        airplane_mode,
+        internet_reachable,
+        latitude,
+        longitude,
+        altitude,
+        accuracy,
+        upload_speed,
+        download_speed,
+        avg_latency,
+        best_latency,
+        server_tested,
+        timestamp
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `
+
+    const values = [
+      data.deviceId || null,
+      data.uniqueId || null,
+      data.deviceName || null,
+      data.os || null,
+      data.osVersion || null,
+      data.ipAddress || null,
+      data.networkType || null,
+      data.airplaneMode ? 1 : 0,
+      data.internetReachable ? 1 : 0,
+      data.latitude || null,
+      data.longitude || null,
+      data.altitude || null,
+      data.accuracy || null,
+      data.uploadSpeed || null,
+      data.downloadSpeed || null,
+      data.avgLatency || null,
+      data.bestLatency || null,
+      data.serverTested || null,
+      data.timestamp || Date.now(),
+    ]
+
+    await db.executeSql(insertQuery, values)
+    console.log('✅ Device data inserted successfully')
+    
+    // Update total samples count
+    try {
+      await updateTotalSamples()
+    } catch (updateError) {
+      console.warn('⚠️ Failed to update total samples:', updateError.message)
+      // Don't fail the insert if stats update fails
+    }
+    
+    return true
+  } catch (error) {
+    console.error('❌ Error inserting device data:', error)
+    return false
+  }
+}
+
+/**
+ * Get all device data records
+ * @param {number} limit - Optional limit for number of records
+ * @returns {Promise<Array>} Array of device data records
+ */
+export const getAllDeviceData = async (limit = null) => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    let query = 'SELECT * FROM device_data ORDER BY timestamp DESC'
+    if (limit) {
+      query += ` LIMIT ${limit}`
+    }
+
+    const [results] = await db.executeSql(query)
+    const rows = results.rows
+    const data = []
+
+    for (let i = 0; i < rows.length; i++) {
+      data.push(rows.item(i))
+    }
+
+    return data
+  } catch (error) {
+    console.error('❌ Error fetching device data:', error)
+    return []
+  }
+}
+
+/**
+ * Get latest device data record
+ * @returns {Promise<object|null>} Latest device data record or null
+ */
+export const getLatestDeviceData = async () => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    const [results] = await db.executeSql(
+      'SELECT * FROM device_data ORDER BY timestamp DESC LIMIT 1',
+      []
+    )
+
+    if (results.rows.length > 0) {
+      return results.rows.item(0)
+    }
+
+    return null
+  } catch (error) {
+    console.error('❌ Error fetching latest device data:', error)
+    return null
+  }
+}
+
+/**
+ * Delete old device data records (keep only last N records)
+ * @param {number} keepCount - Number of records to keep (default: 1000)
+ * @returns {Promise<boolean>} Success status
+ */
+export const deleteOldDeviceData = async (keepCount = 1000) => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    const query = `
+      DELETE FROM device_data 
+      WHERE id NOT IN (
+        SELECT id FROM device_data 
+        ORDER BY timestamp DESC 
+        LIMIT ?
+      )
+    `
+
+    await db.executeSql(query, [keepCount])
+    console.log('✅ Old device data records deleted')
+    return true
+  } catch (error) {
+    console.error('❌ Error deleting old device data records:', error)
+    return false
+  }
+}
+
+/**
+ * Delete device data records by IDs
+ * @param {Array<number>} ids - Array of record IDs to delete
+ * @returns {Promise<boolean>} Success status
+ */
+export const deleteDeviceDataByIds = async (ids) => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    if (!ids || ids.length === 0) {
+      return true
+    }
+
+    // Create placeholders for the IN clause
+    const placeholders = ids.map(() => '?').join(',')
+    const query = `DELETE FROM device_data WHERE id IN (${placeholders})`
+
+    await db.executeSql(query, ids)
+    console.log(`✅ Deleted ${ids.length} device data records`)
+    
+    // Update total samples count after deletion
+    try {
+      await updateTotalSamples()
+    } catch (updateError) {
+      console.warn('⚠️ Failed to update total samples after deletion:', updateError.message)
+      // Don't fail the delete if stats update fails
+    }
+    
+    return true
+  } catch (error) {
+    console.error('❌ Error deleting device data records:', error)
+    return false
+  }
+}
+
+/**
+ * Get device data records that haven't been uploaded yet
+ * @param {number} limit - Maximum number of records to fetch
+ * @returns {Promise<Array>} Array of device data records
+ */
+export const getUnuploadedDeviceData = async (limit = 100) => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    const [results] = await db.executeSql(
+      'SELECT * FROM device_data ORDER BY timestamp ASC LIMIT ?',
+      [limit]
+    )
+
+    const data = []
+    for (let i = 0; i < results.rows.length; i++) {
+      data.push(results.rows.item(i))
+    }
+
+    return data
+  } catch (error) {
+    console.error('❌ Error fetching unuploaded device data:', error)
+    return []
+  }
+}
+
+/**
+ * Get device data database statistics
+ * @returns {Promise<object>} Statistics object
+ */
+export const getDeviceDataStats = async () => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    const [countResults] = await db.executeSql(
+      'SELECT COUNT(*) as count FROM device_data',
+      []
+    )
+    const count = countResults.rows.item(0).count
+
+    const [latestResults] = await db.executeSql(
+      'SELECT MAX(timestamp) as latest FROM device_data',
+      []
+    )
+    const latest = latestResults.rows.item(0).latest
+
+    return {
+      totalRecords: count,
+      latestTimestamp: latest,
+    }
+  } catch (error) {
+    console.error('❌ Error getting device data stats:', error)
+    return {
+      totalRecords: 0,
+      latestTimestamp: null,
+    }
+  }
+}
+
+// ==================== APP STATISTICS FUNCTIONS ====================
+
+/**
+ * Format uptime in milliseconds to human-readable string
+ * @param {number} milliseconds - Uptime in milliseconds
+ * @returns {string} Formatted uptime string
+ */
+const formatUptime = (milliseconds) => {
+  if (!milliseconds || milliseconds < 0) {
+    return '0s'
+  }
+
+  const seconds = Math.floor(milliseconds / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+  const weeks = Math.floor(days / 7)
+  const months = Math.floor(days / 30)
+  const years = Math.floor(days / 365)
+
+  if (years > 0) {
+    return `${years}y ${days % 365}d`
+  } else if (months > 0) {
+    return `${months}mo ${days % 30}d`
+  } else if (weeks > 0) {
+    return `${weeks}w ${days % 7}d`
+  } else if (days > 0) {
+    return `${days}d ${hours % 24}h`
+  } else if (hours > 0) {
+    return `${hours}h ${minutes % 60}m`
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds % 60}s`
+  } else {
+    return `${seconds}s`
+  }
+}
+
+/**
+ * Get today's date string (YYYY-MM-DD)
+ * @returns {string} Date string
+ */
+const getTodayDateString = () => {
+  const today = new Date()
+  return today.toISOString().split('T')[0] // Returns YYYY-MM-DD
+}
+
+/**
+ * Start or update daily uptime tracking
+ * @returns {Promise<boolean>} Success status
+ */
+export const startDailyUptimeTracking = async () => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    const today = getTodayDateString()
+    const now = Date.now()
+
+    // Check if today's record exists
+    const [existingResults] = await db.executeSql(
+      'SELECT * FROM daily_uptime WHERE date = ?',
+      [today]
+    )
+
+    if (existingResults.rows.length === 0) {
+      // Create new record for today
+      await db.executeSql(
+        `INSERT INTO daily_uptime (date, uptime_ms, session_start, last_updated) 
+         VALUES (?, 0, ?, ?)`,
+        [today, now, now]
+      )
+      console.log('✅ Daily uptime tracking started for', today)
+    } else {
+      // Update session_start if not set or if it's a new session (more than 5 minutes gap)
+      const existing = existingResults.rows.item(0)
+      if (!existing.session_start || (now - existing.last_updated > 5 * 60 * 1000)) {
+        // New session - update session_start
+        await db.executeSql(
+          `UPDATE daily_uptime 
+           SET session_start = ?, last_updated = ?, updated_at = CURRENT_TIMESTAMP 
+           WHERE date = ?`,
+          [now, now, today]
+        )
+        console.log('✅ New daily uptime session started for', today)
+      }
+    }
+
+    return true
+  } catch (error) {
+    console.error('❌ Error starting daily uptime tracking:', error)
+    return false
+  }
+}
+
+/**
+ * Update daily uptime (call this periodically while app is running)
+ * @returns {Promise<boolean>} Success status
+ */
+export const updateDailyUptime = async () => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    const today = getTodayDateString()
+    const now = Date.now()
+
+    // Get today's record
+    const [results] = await db.executeSql(
+      'SELECT * FROM daily_uptime WHERE date = ?',
+      [today]
+    )
+
+    if (results.rows.length === 0) {
+      // Create if doesn't exist
+      await startDailyUptimeTracking()
+      return true
+    }
+
+    const record = results.rows.item(0)
+    if (!record.session_start) {
+      // Session not started, start it
+      await db.executeSql(
+        `UPDATE daily_uptime 
+         SET session_start = ?, last_updated = ?, updated_at = CURRENT_TIMESTAMP 
+         WHERE date = ?`,
+        [now, now, today]
+      )
+      return true
+    }
+
+    // Calculate elapsed time since last update (or session start if first update)
+    const lastUpdate = record.last_updated || record.session_start
+    const elapsed = now - lastUpdate
+
+    // Only update if at least 1 second has passed (avoid too frequent updates)
+    if (elapsed >= 1000) {
+      const newUptime = record.uptime_ms + elapsed
+
+      await db.executeSql(
+        `UPDATE daily_uptime 
+         SET uptime_ms = ?, last_updated = ?, updated_at = CURRENT_TIMESTAMP 
+         WHERE date = ?`,
+        [newUptime, now, today]
+      )
+
+      console.log(`✅ Daily uptime updated for ${today}: ${formatUptime(newUptime)}`)
+    }
+
+    return true
+  } catch (error) {
+    console.error('❌ Error updating daily uptime:', error)
+    return false
+  }
+}
+
+/**
+ * Get today's uptime
+ * @returns {Promise<object>} Today's uptime stats
+ */
+export const getTodayUptime = async () => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    const today = getTodayDateString()
+    const now = Date.now()
+
+    // Get today's record
+    const [results] = await db.executeSql(
+      'SELECT * FROM daily_uptime WHERE date = ?',
+      [today]
+    )
+
+    if (results.rows.length === 0) {
+      return {
+        date: today,
+        uptimeMs: 0,
+        uptimeFormatted: '0s',
+        sessionStart: null,
+        isActive: false,
+      }
+    }
+
+    const record = results.rows.item(0)
+    let currentUptime = record.uptime_ms || 0
+
+    // If session is active (last_updated within last 5 minutes), add elapsed time
+    if (record.session_start && record.last_updated) {
+      const timeSinceLastUpdate = now - record.last_updated
+      if (timeSinceLastUpdate < 5 * 60 * 1000) {
+        // Session is still active, add elapsed time
+        currentUptime += timeSinceLastUpdate
+      }
+    }
+
+    return {
+      date: today,
+      uptimeMs: currentUptime,
+      uptimeFormatted: formatUptime(currentUptime),
+      sessionStart: record.session_start,
+      isActive: record.session_start && (now - record.last_updated < 5 * 60 * 1000),
+    }
+  } catch (error) {
+    console.error('❌ Error getting today uptime:', error)
+    return {
+      date: getTodayDateString(),
+      uptimeMs: 0,
+      uptimeFormatted: '0s',
+      sessionStart: null,
+      isActive: false,
+    }
+  }
+}
+
+/**
+ * Update total samples count
+ * @param {number} count - Total number of samples (optional, will count if not provided)
+ * @returns {Promise<boolean>} Success status
+ */
+export const updateTotalSamples = async (count = null) => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    let totalCount = count
+    if (totalCount === null) {
+      const [countResults] = await db.executeSql(
+        'SELECT COUNT(*) as count FROM device_data',
+        []
+      )
+      totalCount = countResults.rows.item(0).count
+    }
+
+    const now = Date.now()
+    await db.executeSql(
+      `UPDATE app_stats 
+       SET total_samples = ?, last_updated = ?, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = (SELECT id FROM app_stats ORDER BY id DESC LIMIT 1)`,
+      [totalCount, now]
+    )
+
+    console.log('✅ Total samples updated:', totalCount)
+    return true
+  } catch (error) {
+    console.error('❌ Error updating total samples:', error)
+    return false
+  }
+}
+
+/**
+ * Get app statistics (total samples and uptime)
+ * @returns {Promise<object>} App stats object
+ */
+export const getAppStats = async () => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    // Get app stats
+    const [statsResults] = await db.executeSql(
+      'SELECT * FROM app_stats ORDER BY id DESC LIMIT 1',
+      []
+    )
+
+    if (statsResults.rows.length === 0) {
+      // Initialize if not exists
+      await initializeAppStats()
+      const [newStatsResults] = await db.executeSql(
+        'SELECT * FROM app_stats ORDER BY id DESC LIMIT 1',
+        []
+      )
+      if (newStatsResults.rows.length > 0) {
+        const stats = newStatsResults.rows.item(0)
+        const now = Date.now()
+        const uptime = now - stats.app_installed_at
+
+        // Get today's uptime
+        const todayUptime = await getTodayUptime()
+
+        return {
+          appInstalledAt: stats.app_installed_at,
+          totalSamples: stats.total_samples || 0,
+          totalUptime: uptime, // in milliseconds
+          totalUptimeFormatted: formatUptime(uptime),
+          todayUptime: todayUptime.uptimeMs,
+          todayUptimeFormatted: todayUptime.uptimeFormatted,
+          todayIsActive: todayUptime.isActive,
+          lastUpdated: stats.last_updated || stats.app_installed_at,
+        }
+      }
+    }
+
+    const stats = statsResults.rows.item(0)
+    const now = Date.now()
+    const uptime = now - stats.app_installed_at
+
+    // Get actual count from device_data table
+    const [countResults] = await db.executeSql(
+      'SELECT COUNT(*) as count FROM device_data',
+      []
+    )
+    const actualCount = countResults.rows.item(0).count
+
+    // Update total_samples if different
+    if (actualCount !== stats.total_samples) {
+      await updateTotalSamples(actualCount)
+    }
+
+    // Get today's uptime
+    const todayUptime = await getTodayUptime()
+
+    return {
+      appInstalledAt: stats.app_installed_at,
+      totalSamples: actualCount,
+      totalUptime: uptime, // in milliseconds
+      totalUptimeFormatted: formatUptime(uptime),
+      todayUptime: todayUptime.uptimeMs,
+      todayUptimeFormatted: todayUptime.uptimeFormatted,
+      todayIsActive: todayUptime.isActive,
+      lastUpdated: stats.last_updated || stats.app_installed_at,
+    }
+  } catch (error) {
+    console.error('❌ Error getting app stats:', error)
+    return {
+      appInstalledAt: null,
+      totalSamples: 0,
+      totalUptime: 0,
+      totalUptimeFormatted: '0s',
+      todayUptime: 0,
+      todayUptimeFormatted: '0s',
+      todayIsActive: false,
+      lastUpdated: null,
+    }
   }
 }

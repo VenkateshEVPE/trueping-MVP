@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import GridPatternBackground from '../components/GridPatternBackground'
 import { signIn } from '../services/auth/auth'
-import { saveUser, updateUserToken } from '../database/database'
+import { saveUser, updateUserToken, arePermissionsGranted } from '../database/database'
 
 const SignIn = () => {
   const insets = useSafeAreaInsets()
@@ -55,7 +55,8 @@ const SignIn = () => {
           email: email.trim(),
           role: response.role || '',
           token: token,
-          email_verified: response.email_verified ? 1 : 0,
+          email_verified: response.email_verified ? true : false,
+          skipped_login: false, // Clear skipped_login flag on normal login
         })
         
         // Update token if separate call needed
@@ -72,8 +73,16 @@ const SignIn = () => {
       // Success - handle successful login
       setIsLoading(false)
       console.log('Login successful:', response)
-      // Navigate to tabs screen
-      navigation.replace('tabs')
+      
+      // Check if permissions have been granted
+      const permissionsGranted = await arePermissionsGranted()
+      if (permissionsGranted) {
+        // Navigate to tabs screen
+        navigation.replace('tabs')
+      } else {
+        // Navigate to permissions screen
+        navigation.replace('permissions')
+      }
     } catch (err) {
       setIsLoading(false)
       // Handle error
@@ -92,7 +101,39 @@ const SignIn = () => {
       
       {/* Skip button */}
       <View className="absolute top-0 right-0 z-10" style={{ paddingTop: insets.top + 10, paddingRight: 20 }}>
-        <TouchableOpacity onPress={() => navigation.replace('tabs')}>
+        <TouchableOpacity onPress={async () => {
+          try {
+            // Save user with skipped_login flag
+            await saveUser({
+              id: null,
+              user_id: null,
+              name: 'Guest User',
+              email: `guest_${Date.now()}@skip.local`,
+              password: null,
+              role: 'guest',
+              token: null,
+              email_verified: false,
+              skipped_login: true,
+            })
+            console.log('✅ Skip login: User saved with skipped_login flag')
+            
+            const permissionsGranted = await arePermissionsGranted()
+            if (permissionsGranted) {
+              navigation.replace('tabs')
+            } else {
+              navigation.replace('permissions')
+            }
+          } catch (error) {
+            console.error('Error saving skip login user:', error)
+            // Still navigate even if save fails
+            const permissionsGranted = await arePermissionsGranted()
+            if (permissionsGranted) {
+              navigation.replace('tabs')
+            } else {
+              navigation.replace('permissions')
+            }
+          }
+        }}>
           <Text className="text-base font-satoshi text-buttonBackground underline">
             Skip
           </Text>

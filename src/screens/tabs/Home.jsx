@@ -28,10 +28,12 @@ import {
   startBackgroundService,
   stopBackgroundService,
   isBackgroundServiceRunning,
+  ensureBackgroundServiceRunning,
   getLatestLocation,
   getLatestNetworkInfo,
   getLatestTrafficStats,
 } from '../../services/BackgroundLocationService'
+import { arePermissionsGranted } from '../../database/database'
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window')
 const VIDEO_HEIGHT = SCREEN_HEIGHT / 1.7
@@ -258,19 +260,77 @@ const Home = () => {
     return cleanup
   }, [])
 
-  // Check background service status on mount
+  // Start background service and check status on mount
   useEffect(() => {
-    const checkServiceStatus = async () => {
+    const initializeBackgroundService = async () => {
       try {
+        // First check if permissions have been granted
+        const permissionsGranted = await arePermissionsGranted()
+        if (!permissionsGranted) {
+          console.log('📍 Permissions not granted yet, skipping background service start')
+          return
+        }
+
+        // Check if service is already running
         const isRunning = await isBackgroundServiceRunning()
         setIsBackgroundServiceActive(isRunning)
         console.log('📍 Background service status:', isRunning)
+
+        // If not running, start it (but don't show alerts - handle silently)
+        if (!isRunning) {
+          console.log('📍 Starting background location service...')
+          try {
+            const started = await startBackgroundService()
+            if (started) {
+              setIsBackgroundServiceActive(true)
+              console.log('✅ Background location service started successfully')
+            } else {
+              console.warn('⚠️ Failed to start background location service (permissions may be needed)')
+            }
+          } catch (startError) {
+            console.error('⚠️ Error starting background service:', startError)
+            // Don't crash the app, just log the error
+          }
+        }
       } catch (error) {
-        console.error('Error checking background service status:', error)
+        console.error('Error initializing background service:', error)
+        // Don't crash the app, just log the error
       }
     }
-    checkServiceStatus()
+    
+    // Add a small delay to ensure screen is fully mounted
+    const timer = setTimeout(() => {
+      initializeBackgroundService()
+    }, 500)
+    
+    return () => clearTimeout(timer)
   }, [])
+
+  // Periodically check and restart service if it was killed
+  useEffect(() => {
+    if (!isBackgroundServiceActive) return
+
+    const checkServiceInterval = setInterval(async () => {
+      try {
+        const isRunning = await isBackgroundServiceRunning()
+        if (!isRunning) {
+          console.warn('⚠️ Background service stopped, attempting to restart...')
+          const restarted = await ensureBackgroundServiceRunning(false)
+          if (restarted) {
+            setIsBackgroundServiceActive(true)
+            console.log('✅ Background service restarted successfully')
+          } else {
+            setIsBackgroundServiceActive(false)
+            console.warn('⚠️ Failed to restart background service')
+          }
+        }
+      } catch (error) {
+        console.error('Error checking background service:', error)
+      }
+    }, 30000) // Check every 30 seconds
+
+    return () => clearInterval(checkServiceInterval)
+  }, [isBackgroundServiceActive])
 
   // Update background data in UI periodically when service is active
   useEffect(() => {
@@ -421,12 +481,12 @@ const Home = () => {
       >
         {/* Video background - scrollable */}
         {!hasVideoError ? (
-          <VideoBackground
-            insets={insets}
+        <VideoBackground
+          insets={insets}
             onBuffer={onBuffer}
             onError={onError}
             onLoad={onLoad}
-          />
+        />
         ) : (
           <View style={{ 
             position: 'relative', 

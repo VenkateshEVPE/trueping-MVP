@@ -437,7 +437,7 @@ const Settings = () => {
       {/* Grid Pattern Background */}
       <GridPatternBackground />
       
-      <ScrollView
+      <ScrollView 
         className="flex-1"
         contentContainerStyle={{
           paddingTop: insets.top,
@@ -537,7 +537,7 @@ const Settings = () => {
             {atrxBalance} ATRX
           </Text>
         </View>
-
+          
         {/* Settings Lists */}
         <View style={{ width: '100%', gap: 15, paddingHorizontal: 15 }}>
           {/* First Settings Card */}
@@ -600,7 +600,7 @@ const Settings = () => {
             <SettingsItem
               icon={LogoutIcon}
               title="Logout"
-              onPress={handleLogout}
+            onPress={handleLogout}
               iconSize={22}
               showDivider={true}
             />
@@ -655,7 +655,7 @@ const Settings = () => {
             }}
           >
             "Authra Technologies FZ-LLC © 2025"
-          </Text>
+            </Text>
         </View>
       </ScrollView>
     </View>

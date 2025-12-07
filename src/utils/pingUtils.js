@@ -1,4 +1,5 @@
 import Ping from 'react-native-ping'
+import NetInfo from '@react-native-community/netinfo'
 
 /**
  * Start live ping monitoring - pings continuously
@@ -62,6 +63,13 @@ export const performSpeedTest = async () => {
   try {
     console.log('🏓 Starting speed test with ping...')
 
+    // Check network connectivity first
+    const netInfo = await NetInfo.fetch()
+    if (!netInfo.isConnected || !netInfo.isInternetReachable) {
+      console.warn('⚠️ No network connection available for speed test')
+      return null
+    }
+
     // Test multiple servers to get average latency
     const servers = [
       { name: 'Google DNS', ip: '8.8.8.8' },
@@ -77,16 +85,27 @@ export const performSpeedTest = async () => {
         const ms = await Ping.start(server.ip, { timeout: 3000 })
         const endTime = Date.now()
 
-        results.push({
-          server: server.name,
-          ip: server.ip,
-          latency: ms,
-          testTime: endTime - startTime,
-        })
+        // Validate ping result
+        if (ms && ms > 0 && ms < 10000) {
+          results.push({
+            server: server.name,
+            ip: server.ip,
+            latency: ms,
+            testTime: endTime - startTime,
+          })
 
-        console.log(`✅ ${server.name} (${server.ip}): ${ms}ms`)
+          console.log(`✅ ${server.name} (${server.ip}): ${ms}ms`)
+        } else {
+          console.warn(`⚠️ ${server.name} (${server.ip}) returned invalid result: ${ms}ms`)
+        }
       } catch (error) {
-        console.warn(`❌ ${server.name} (${server.ip}) failed:`, error.message)
+        const errorMessage = error.message || 'Unknown error'
+        console.warn(`❌ ${server.name} (${server.ip}) failed:`, errorMessage)
+        
+        // Log specific error types for debugging
+        if (errorMessage.includes('HostError') || errorMessage.includes('Unknown')) {
+          console.warn(`  → This may indicate network connectivity issues with ${server.name}`)
+        }
       }
     }
 

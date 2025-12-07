@@ -13,6 +13,7 @@ import HomeIcon from '../components/icons/HomeIcon'
 import WalletIcon from '../components/icons/WalletIcon'
 import ChartIcon from '../components/icons/ChartIcon'
 import SettingsIcon from '../components/icons/SettingsIcon'
+import { startPeriodicDataCollection, startPeriodicUploadService } from '../services/deviceDataCollector'
 
 // Custom Tab Bar Component
 function MyTabBar({ state, descriptors, navigation }) {
@@ -161,6 +162,37 @@ const Tab = createBottomTabNavigator()
 const CustomTabBar = (props) => <MyTabBar {...props} />
 
 function MyTabs() {
+  // Start data collection and upload services when tabs mount (user is authenticated)
+  useEffect(() => {
+    let dataCollectionCleanup = null
+    let uploadServiceCleanup = null
+
+    const startServices = async () => {
+      console.log('🚀 Starting data collection and upload services in tabs...')
+      
+      // Start periodic data collection (every 2 minutes)
+      dataCollectionCleanup = startPeriodicDataCollection(120000)
+      console.log('✅ Periodic device data collection started (every 2 minutes)')
+      
+      // Start periodic upload service (every 30 seconds)
+      uploadServiceCleanup = startPeriodicUploadService(30000)
+      console.log('✅ Periodic upload service started (every 30 seconds)')
+    }
+
+    startServices()
+
+    // Cleanup: Stop services when navigating away from tabs
+    return () => {
+      console.log('🛑 Stopping data collection and upload services (navigating away from tabs)')
+      if (dataCollectionCleanup) {
+        dataCollectionCleanup()
+      }
+      if (uploadServiceCleanup) {
+        uploadServiceCleanup()
+      }
+    }
+  }, [])
+
   return (
     <Tab.Navigator
       tabBar={CustomTabBar}

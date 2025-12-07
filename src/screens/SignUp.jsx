@@ -261,13 +261,14 @@ const SignUp = () => {
       // Save user to database
       try {
         await saveUser({
+          skipped_login: false, // Clear skipped_login flag on sign up
           id: response.id,
           user_id: response.id,
           name: name.trim(),
           email: email.trim(),
           password: password, // Note: In production, don't store plain password
           role: response.role || 'contributor',
-          email_verified: 0,
+          email_verified: false,
         })
         console.log('User saved to database successfully')
       } catch (dbError) {

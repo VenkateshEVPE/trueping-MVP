@@ -409,7 +409,7 @@ const Wallet = () => {
 
   // Render Market content
   const renderMarketContent = () => {
-    return (
+  return (
       <ScrollView
         className="flex-1"
         contentContainerStyle={{
