@@ -7,33 +7,91 @@ import NetInfo from '@react-native-community/netinfo'
  * @returns {Function} Cleanup function to stop monitoring
  */
 export const startLivePing = (onPingUpdate) => {
-  const pingServer = '8.8.8.8' // Use Google DNS for live ping
+  // List of servers to try (fallback if one fails)
+  const pingServers = ['8.8.8.8', '1.1.1.1', '208.67.222.222'] // Google DNS, Cloudflare, OpenDNS
+  let currentServerIndex = 0
   let pingCount = 0
+  let consecutiveFailures = 0
+  let isActive = true
 
   const performLivePing = async () => {
+    if (!isActive) return
+
     try {
-      const ms = await Ping.start(pingServer, { timeout: 2000 })
+      // Check network connectivity first
+      const netInfo = await NetInfo.fetch()
+      if (!netInfo.isConnected || !netInfo.isInternetReachable) {
+        console.warn('⚠️ No network connection, skipping ping')
+        onPingUpdate(999) // Show error state
+        consecutiveFailures++
+        return
+      }
 
-      // Round to whole number and update
-      const roundedLatency = Math.round(ms)
-      onPingUpdate(roundedLatency)
+      const pingServer = pingServers[currentServerIndex]
+      
+      try {
+        const ms = await Ping.start(pingServer, { timeout: 3000 })
 
-      pingCount++
-      console.log(`🏓 Live ping #${pingCount}: ${roundedLatency}ms`)
+        // Validate ping result
+        if (ms && ms > 0 && ms < 10000) {
+          // Round to whole number and update
+          const roundedLatency = Math.round(ms)
+          onPingUpdate(roundedLatency)
+
+          pingCount++
+          consecutiveFailures = 0
+          console.log(`🏓 Live ping #${pingCount} to ${pingServer}: ${roundedLatency}ms`)
+        } else {
+          throw new Error(`Invalid ping result: ${ms}ms`)
+        }
+      } catch (pingError) {
+        const errorMessage = pingError.message || 'Unknown error'
+        
+        // If it's a host error, try next server
+        if (errorMessage.includes('HostError') || errorMessage.includes('Unknown')) {
+          consecutiveFailures++
+          
+          // Try next server
+          currentServerIndex = (currentServerIndex + 1) % pingServers.length
+          console.warn(`⚠️ Ping to ${pingServer} failed (${errorMessage}), trying next server: ${pingServers[currentServerIndex]}`)
+          
+          // If all servers failed, show error state
+          if (consecutiveFailures >= pingServers.length * 2) {
+            console.warn(`❌ All ping servers failed after ${consecutiveFailures} attempts`)
+            onPingUpdate(999) // Show error state
+            consecutiveFailures = 0 // Reset to try again
+          }
+        } else {
+          // Other errors - show error state
+          console.warn(`❌ Live ping to ${pingServer} failed:`, errorMessage)
+          onPingUpdate(999) // Show error state
+          consecutiveFailures++
+        }
+      }
     } catch (error) {
-      console.warn(`❌ Live ping failed:`, error.message)
+      console.warn(`❌ Live ping error:`, error.message)
       onPingUpdate(999) // Show error state
+      consecutiveFailures++
     }
   }
 
-  // Perform initial ping
-  performLivePing()
+  // Perform initial ping with a small delay to ensure network is ready
+  setTimeout(() => {
+    if (isActive) {
+      performLivePing()
+    }
+  }, 1000)
 
-  // Set up interval for continuous pinging (every 2 seconds)
-  const interval = setInterval(performLivePing, 2000)
+  // Set up interval for continuous pinging (every 3 seconds to avoid overwhelming)
+  const interval = setInterval(() => {
+    if (isActive) {
+      performLivePing()
+    }
+  }, 3000)
 
   // Return cleanup function
   return () => {
+    isActive = false
     clearInterval(interval)
     console.log('🏓 Live ping interval cleared')
   }

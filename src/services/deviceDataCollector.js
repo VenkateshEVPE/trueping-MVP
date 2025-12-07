@@ -363,6 +363,16 @@ export const uploadDeviceDataToServer = async (deviceDataRecords) => {
     // Upload proofs using the proof service
     const result = await uploadProofs(proofs)
 
+    // Increment proofs uploaded today count if upload was successful
+    if (result.success && result.succeeded > 0) {
+      try {
+        const { incrementProofsUploadedToday } = require('../database/database')
+        await incrementProofsUploadedToday(result.succeeded)
+      } catch (incrementError) {
+        console.warn('⚠️ Failed to increment proofs uploaded today:', incrementError.message)
+      }
+    }
+
     // Note: We don't increment samplesCollected here anymore
     // samplesCollected now represents all stored samples (incremented when stored)
     // This ensures accurate count of collected samples

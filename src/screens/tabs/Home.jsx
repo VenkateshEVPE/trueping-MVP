@@ -36,7 +36,7 @@ import {
 import { arePermissionsGranted } from '../../services/permissionsStorage'
 
 // Database
-import { getAppStats, getTodayUptime, getTodayAvgLatency } from '../../database/database'
+import { getAppStats, getTodayUptime, getTodayAvgLatency, getProofsUploadedToday } from '../../database/database'
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window')
 const VIDEO_HEIGHT = SCREEN_HEIGHT / 1.7
@@ -109,6 +109,7 @@ const Home = () => {
     samplesCollected: 0,
     uptimePercent: 0,
     avgLatency: null,
+    proofsSubmittedToday: 0,
   })
 
   // Background service state
@@ -229,10 +230,14 @@ const Home = () => {
           avgLatency = pingLatency
         }
         
+        // Get proofs submitted today
+        const proofsSubmittedToday = await getProofsUploadedToday()
+        
         setMetrics({
           samplesCollected: appStats.totalSamples || 0,
           uptimePercent: Math.min(100, Math.max(0, uptimePercent)), // Clamp between 0-100
           avgLatency: avgLatency,
+          proofsSubmittedToday: proofsSubmittedToday,
         })
       } catch (error) {
         console.error('❌ Error loading metrics:', error)
@@ -571,6 +576,7 @@ const Home = () => {
             deviceId={deviceInfo.deviceId}
             cpuUsage={deviceInfo.cpuUsage}
             ramUsage={deviceInfo.ramUsage}
+            proofsSubmittedToday={metrics.proofsSubmittedToday}
           />
 
         {/* Left Panel - Proof Interval */}

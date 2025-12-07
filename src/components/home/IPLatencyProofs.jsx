@@ -4,9 +4,9 @@ import { Dimensions } from 'react-native'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
-const IPLatencyProofs = ({ insets, deviceId, cpuUsage, ramUsage }) => {
+const IPLatencyProofs = ({ insets, deviceId, cpuUsage, ramUsage, proofsSubmittedToday = 0 }) => {
   // Debug: Log what values we're receiving
-  console.log('📱 IPLatencyProofs received:', { cpuUsage, ramUsage })
+  console.log('📱 IPLatencyProofs received:', { cpuUsage, ramUsage, proofsSubmittedToday })
   
   return (
     <View className="absolute flex-row items-baseline justify-between px-5" style={{ left: SCREEN_WIDTH / 2 - 183.3105, top: 373 + insets.top, width: 366.621 }}>
@@ -19,7 +19,7 @@ const IPLatencyProofs = ({ insets, deviceId, cpuUsage, ramUsage }) => {
             </Text>
           </View>
           <View className="bg-white px-[5px] justify-center">
-            <Text className="text-[12px] text-[#212322] font-offBit101Bold">452</Text>
+            <Text className="text-[12px] text-[#212322] font-offBit101Bold">{proofsSubmittedToday}</Text>
           </View>
         </View>
         {/* Device ID */}

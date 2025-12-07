@@ -68,6 +68,9 @@ export const initDatabase = async () => {
     // Migrate users table to add skipped_login column if needed
     await migrateUsersTableForSkipLogin()
 
+    // Migrate app_stats table to add proofs_uploaded_today column if needed
+    await migrateAppStatsForProofsTracking()
+
     return db
   } catch (error) {
     console.error('Error opening database:', error)
@@ -209,6 +212,53 @@ const migrateUsersTableForSkipLogin = async () => {
     }
   } catch (error) {
     console.error('Error migrating users table for skip login:', error)
+    // Don't throw - migration failures shouldn't break the app
+  }
+}
+
+/**
+ * Migrate app_stats table to add proofs_uploaded_today and last_proof_reset_date columns if they don't exist
+ */
+const migrateAppStatsForProofsTracking = async () => {
+  try {
+    if (!db) {
+      return
+    }
+
+    // Check if proofs_uploaded_today column exists
+    const [results] = await db.executeSql(
+      "PRAGMA table_info(app_stats)"
+    )
+
+    let proofsColumnExists = false
+    let resetDateColumnExists = false
+    for (let i = 0; i < results.rows.length; i++) {
+      const column = results.rows.item(i).name
+      if (column === 'proofs_uploaded_today') {
+        proofsColumnExists = true
+      }
+      if (column === 'last_proof_reset_date') {
+        resetDateColumnExists = true
+      }
+    }
+
+    if (!proofsColumnExists) {
+      // Add proofs_uploaded_today column
+      await db.executeSql(
+        'ALTER TABLE app_stats ADD COLUMN proofs_uploaded_today INTEGER DEFAULT 0'
+      )
+      console.log('✅ Added proofs_uploaded_today column to app_stats table')
+    }
+
+    if (!resetDateColumnExists) {
+      // Add last_proof_reset_date column
+      await db.executeSql(
+        'ALTER TABLE app_stats ADD COLUMN last_proof_reset_date TEXT'
+      )
+      console.log('✅ Added last_proof_reset_date column to app_stats table')
+    }
+  } catch (error) {
+    console.error('Error migrating app_stats table for proofs tracking:', error)
     // Don't throw - migration failures shouldn't break the app
   }
 }
@@ -1771,5 +1821,108 @@ export const getTodayAvgLatency = async () => {
   } catch (error) {
     console.error('❌ Error getting today average latency:', error)
     return null
+  }
+}
+
+/**
+ * Increment proofs uploaded today count
+ * @param {number} count - Number of proofs to increment (default: 1)
+ * @returns {Promise<boolean>} Success status
+ */
+export const incrementProofsUploadedToday = async (count = 1) => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    // Get today's date string (YYYY-MM-DD)
+    const today = new Date()
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
+    // Get current stats
+    const [statsResults] = await db.executeSql(
+      'SELECT * FROM app_stats ORDER BY id DESC LIMIT 1',
+      []
+    )
+
+    if (statsResults.rows.length === 0) {
+      // Initialize app stats if it doesn't exist
+      await initializeAppStats()
+    }
+
+    // Get stats again after potential initialization
+    const [updatedStatsResults] = await db.executeSql(
+      'SELECT * FROM app_stats ORDER BY id DESC LIMIT 1',
+      []
+    )
+
+    if (updatedStatsResults.rows.length > 0) {
+      const stats = updatedStatsResults.rows.item(0)
+      const lastResetDate = stats.last_proof_reset_date
+
+      // Reset count if it's a new day
+      if (lastResetDate !== todayStr) {
+        await db.executeSql(
+          `UPDATE app_stats 
+           SET proofs_uploaded_today = ?, last_proof_reset_date = ?, last_updated = ?, updated_at = CURRENT_TIMESTAMP 
+           WHERE id = (SELECT id FROM app_stats ORDER BY id DESC LIMIT 1)`,
+          [count, todayStr, Date.now()]
+        )
+        console.log(`✅ Reset and set proofs_uploaded_today to ${count} for new day`)
+      } else {
+        // Increment existing count
+        await db.executeSql(
+          `UPDATE app_stats 
+           SET proofs_uploaded_today = proofs_uploaded_today + ?, last_updated = ?, updated_at = CURRENT_TIMESTAMP 
+           WHERE id = (SELECT id FROM app_stats ORDER BY id DESC LIMIT 1)`,
+          [count, Date.now()]
+        )
+        console.log(`✅ Incremented proofs_uploaded_today by ${count}`)
+      }
+    }
+
+    return true
+  } catch (error) {
+    console.error('❌ Error incrementing proofs uploaded today:', error)
+    return false
+  }
+}
+
+/**
+ * Get proofs uploaded today count
+ * @returns {Promise<number>} Number of proofs uploaded today
+ */
+export const getProofsUploadedToday = async () => {
+  try {
+    if (!db) {
+      throw new Error('Database not initialized')
+    }
+
+    // Get today's date string (YYYY-MM-DD)
+    const today = new Date()
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
+    // Get app stats
+    const [statsResults] = await db.executeSql(
+      'SELECT * FROM app_stats ORDER BY id DESC LIMIT 1',
+      []
+    )
+
+    if (statsResults.rows.length === 0) {
+      return 0
+    }
+
+    const stats = statsResults.rows.item(0)
+    const lastResetDate = stats.last_proof_reset_date
+
+    // If it's a new day or no reset date, return 0
+    if (!lastResetDate || lastResetDate !== todayStr) {
+      return 0
+    }
+
+    return stats.proofs_uploaded_today || 0
+  } catch (error) {
+    console.error('❌ Error getting proofs uploaded today:', error)
+    return 0
   }
 }
