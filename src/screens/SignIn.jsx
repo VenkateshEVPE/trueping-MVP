@@ -4,7 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import GridPatternBackground from '../components/GridPatternBackground'
 import { signIn } from '../services/auth/auth'
-import { saveUser, updateUserToken, arePermissionsGranted } from '../database/database'
+import { saveUser, updateUserToken } from '../database/database'
+import { arePermissionsGranted } from '../services/permissionsStorage'
 
 const SignIn = () => {
   const insets = useSafeAreaInsets()

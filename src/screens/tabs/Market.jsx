@@ -75,7 +75,7 @@ const Market = () => {
           >
             ATRX
           </Text>
-          <TouchableOpacity
+          {/* <TouchableOpacity
             onPress={handleShare}
             style={{
               position: 'absolute',
@@ -87,7 +87,7 @@ const Market = () => {
             }}
           >
             <ShareIcon color="#F6F6F6" size={36.5} />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
 
         {/* Coin Image */}

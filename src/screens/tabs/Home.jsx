@@ -33,7 +33,7 @@ import {
   getLatestNetworkInfo,
   getLatestTrafficStats,
 } from '../../services/BackgroundLocationService'
-import { arePermissionsGranted } from '../../database/database'
+import { arePermissionsGranted } from '../../services/permissionsStorage'
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window')
 const VIDEO_HEIGHT = SCREEN_HEIGHT / 1.7
@@ -471,8 +471,8 @@ const Home = () => {
       <ScrollView 
         className="flex-1"
         contentContainerStyle={{ 
-          paddingBottom: 200,
-          minHeight: Math.max(VIDEO_HEIGHT + insets.top, 1129.36 + 170 + insets.top + 200),
+          paddingBottom: insets.bottom ,
+          minHeight: Math.max(VIDEO_HEIGHT + insets.top, 1129.36 + 170 + insets.top + insets.bottom + 10),
         }}
         showsVerticalScrollIndicator={false}
         scrollEnabled={true}

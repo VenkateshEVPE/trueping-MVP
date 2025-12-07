@@ -168,15 +168,33 @@ function MyTabs() {
     let uploadServiceCleanup = null
 
     const startServices = async () => {
-      console.log('🚀 Starting data collection and upload services in tabs...')
-      
-      // Start periodic data collection (every 2 minutes)
-      dataCollectionCleanup = startPeriodicDataCollection(120000)
-      console.log('✅ Periodic device data collection started (every 2 minutes)')
-      
-      // Start periodic upload service (every 2 minutes)
-      uploadServiceCleanup = startPeriodicUploadService(120000)
-      console.log('✅ Periodic upload service started (every 2 minutes)')
+      try {
+        console.log('🚀 Starting data collection and upload services in tabs...')
+        
+        // Add a delay to ensure permissions are fully processed and screen is ready
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        // Start periodic data collection (every 2 minutes)
+        try {
+          dataCollectionCleanup = startPeriodicDataCollection(120000)
+          console.log('✅ Periodic device data collection started (every 2 minutes)')
+        } catch (collectionError) {
+          console.error('❌ Error starting periodic data collection:', collectionError)
+          // Don't crash - continue with upload service
+        }
+        
+        // Start periodic upload service (every 2 minutes)
+        try {
+          uploadServiceCleanup = startPeriodicUploadService(120000)
+          console.log('✅ Periodic upload service started (every 2 minutes)')
+        } catch (uploadError) {
+          console.error('❌ Error starting periodic upload service:', uploadError)
+          // Don't crash - app can still function
+        }
+      } catch (error) {
+        console.error('❌ Error starting services in tabs:', error)
+        // Don't crash the app - log and continue
+      }
     }
 
     startServices()
@@ -184,11 +202,15 @@ function MyTabs() {
     // Cleanup: Stop services when navigating away from tabs
     return () => {
       console.log('🛑 Stopping data collection and upload services (navigating away from tabs)')
-      if (dataCollectionCleanup) {
-        dataCollectionCleanup()
-      }
-      if (uploadServiceCleanup) {
-        uploadServiceCleanup()
+      try {
+        if (dataCollectionCleanup) {
+          dataCollectionCleanup()
+        }
+        if (uploadServiceCleanup) {
+          uploadServiceCleanup()
+        }
+      } catch (cleanupError) {
+        console.error('❌ Error during cleanup:', cleanupError)
       }
     }
   }, [])

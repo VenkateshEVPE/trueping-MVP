@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import { PermissionsAndroid } from 'react-native'
 import GridPatternBackground from '../components/GridPatternBackground'
-import { markPermissionsAsGranted } from '../database/database'
+import { markPermissionsAsGranted } from '../services/permissionsStorage'
 
 const PermissionsScreen = () => {
   const insets = useSafeAreaInsets()
@@ -153,8 +153,27 @@ const PermissionsScreen = () => {
       // All permissions requested
       setIsRequesting(false)
 
-      // Mark permissions as granted in database
-      await markPermissionsAsGranted()
+      // Mark permissions as granted in AsyncStorage
+      try {
+        const success = await markPermissionsAsGranted()
+        if (!success) {
+          console.error('Failed to mark permissions as granted')
+          Alert.alert(
+            'Warning',
+            'Permissions were granted but could not be saved. The app may ask for permissions again.',
+            [{ text: 'OK', onPress: () => navigation.replace('tabs') }]
+          )
+          return
+        }
+      } catch (error) {
+        console.error('Error marking permissions as granted:', error)
+        Alert.alert(
+          'Warning',
+          'Permissions were granted but could not be saved. The app may ask for permissions again.',
+          [{ text: 'OK', onPress: () => navigation.replace('tabs') }]
+        )
+        return
+      }
 
       // Navigate to tabs (data collection and upload services will start in tabs)
       navigation.replace('tabs')

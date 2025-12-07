@@ -276,7 +276,28 @@ export const collectDeviceAndNetworkData = async () => {
     return collectedData
   } catch (error) {
     console.error('❌ Error collecting device and network data:', error)
-    throw error
+    // Return a minimal data object instead of throwing to prevent crashes
+    return {
+      deviceId: 'Unknown',
+      uniqueId: 'Unknown',
+      deviceName: 'Unknown Device',
+      os: 'Unknown OS',
+      osVersion: 'Unknown Version',
+      ipAddress: 'N/A',
+      networkType: 'unknown',
+      airplaneMode: false,
+      internetReachable: false,
+      latitude: null,
+      longitude: null,
+      altitude: null,
+      accuracy: null,
+      uploadSpeed: null,
+      downloadSpeed: null,
+      avgLatency: null,
+      bestLatency: null,
+      serverTested: 'N/A',
+      timestamp: Date.now(),
+    }
   }
 }
 
@@ -358,38 +379,69 @@ export const collectStoreUploadAndCleanup = async () => {
   try {
     console.log('🔄 Starting collect, store, upload, and cleanup cycle...')
     
-    // Step 1: Collect new data
-    const collectedData = await collectDeviceAndNetworkData()
+    // Step 1: Collect new data (with error handling)
+    let collectedData = null
+    try {
+      collectedData = await collectDeviceAndNetworkData()
+    } catch (collectionError) {
+      console.error('❌ Error collecting device data:', collectionError)
+      // Continue with upload of existing data even if collection fails
+      collectedData = null
+    }
     
-    // Step 2: Store in database
-    const stored = await insertDeviceData(collectedData)
-    if (!stored) {
-      console.warn('⚠️ Failed to store device data')
-    } else {
-      console.log('✅ Device data collected and stored successfully')
+    // Step 2: Store in database (only if we collected data)
+    if (collectedData) {
+      try {
+        const stored = await insertDeviceData(collectedData)
+        if (!stored) {
+          console.warn('⚠️ Failed to store device data')
+        } else {
+          console.log('✅ Device data collected and stored successfully')
+        }
+      } catch (storeError) {
+        console.error('❌ Error storing device data:', storeError)
+        // Continue with upload even if store fails
+      }
     }
 
     // Step 3: Get all unuploaded records (including the one we just stored)
-    const unuploadedRecords = await getUnuploadedDeviceData(100) // Upload up to 100 records at a time
+    let unuploadedRecords = []
+    try {
+      unuploadedRecords = await getUnuploadedDeviceData(100) // Upload up to 100 records at a time
+    } catch (fetchError) {
+      console.error('❌ Error fetching unuploaded records:', fetchError)
+      // If we can't fetch, just return - don't crash
+      return false
+    }
 
     if (unuploadedRecords.length > 0) {
       console.log(`📤 Found ${unuploadedRecords.length} unuploaded records, uploading to API...`)
       
       // Step 4: Upload all unuploaded records to server
-      const uploadSuccess = await uploadDeviceDataToServer(unuploadedRecords)
+      try {
+        const uploadSuccess = await uploadDeviceDataToServer(unuploadedRecords)
 
-      if (uploadSuccess) {
-        // Step 5: Delete uploaded records from SQLite
-        const idsToDelete = unuploadedRecords.map((record) => record.id)
-        const deleteSuccess = await deleteDeviceDataByIds(idsToDelete)
+        if (uploadSuccess) {
+          // Step 5: Delete uploaded records from SQLite
+          try {
+            const idsToDelete = unuploadedRecords.map((record) => record.id)
+            const deleteSuccess = await deleteDeviceDataByIds(idsToDelete)
 
-        if (deleteSuccess) {
-          console.log(`✅ Successfully uploaded and deleted ${unuploadedRecords.length} device data records`)
+            if (deleteSuccess) {
+              console.log(`✅ Successfully uploaded and deleted ${unuploadedRecords.length} device data records`)
+            } else {
+              console.warn('⚠️ Upload successful but failed to delete records from SQLite')
+            }
+          } catch (deleteError) {
+            console.error('❌ Error deleting uploaded records:', deleteError)
+            // Don't crash - records will be uploaded again next time
+          }
         } else {
-          console.warn('⚠️ Upload successful but failed to delete records from SQLite')
+          console.warn('⚠️ Upload failed, keeping records in SQLite for retry')
         }
-      } else {
-        console.warn('⚠️ Upload failed, keeping records in SQLite for retry')
+      } catch (uploadError) {
+        console.error('❌ Error uploading device data:', uploadError)
+        // Don't crash - records will be retried next time
       }
     } else {
       console.log('ℹ️ No unuploaded device data records to upload')
@@ -398,6 +450,7 @@ export const collectStoreUploadAndCleanup = async () => {
     return true
   } catch (error) {
     console.error('❌ Error in collectStoreUploadAndCleanup:', error)
+    // Return false but don't throw - prevent crashes
     return false
   }
 }
@@ -498,12 +551,21 @@ export const startPeriodicUploadService = (intervalMs = 120000) => {
 export const startPeriodicDataCollection = (intervalMs = 120000) => {
   console.log(`🔄 Starting periodic data collection (interval: ${intervalMs}ms = ${intervalMs / 60000} minutes)`)
 
-  // Collect, store, upload, and cleanup immediately
-  collectStoreUploadAndCleanup()
+  // Collect, store, upload, and cleanup immediately (with error handling)
+  // Add a small delay to ensure permissions are ready
+  setTimeout(() => {
+    collectStoreUploadAndCleanup().catch(error => {
+      console.error('❌ Error in initial data collection:', error)
+      // Don't crash - continue with interval
+    })
+  }, 2000) // 2 second delay to ensure permissions are processed
 
   // Set up interval
   const interval = setInterval(() => {
-    collectStoreUploadAndCleanup()
+    collectStoreUploadAndCleanup().catch(error => {
+      console.error('❌ Error in periodic data collection:', error)
+      // Don't crash - continue with next interval
+    })
   }, intervalMs)
 
   // Return cleanup function

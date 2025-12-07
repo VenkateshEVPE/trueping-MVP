@@ -446,11 +446,18 @@ const Wallet = () => {
               right: 16,
               width: 36.5,
               height: 36.5,
+              borderRadius: 18.25,
+              backgroundColor: '#2A2A2A',
               alignItems: 'center',
               justifyContent: 'center',
+              shadowColor: '#E65300',
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: 0.5,
+              shadowRadius: 4,
+              elevation: 4,
             }}
           >
-            <ShareIcon color="#F6F6F6" size={36.5} />
+            <ShareIcon color="#E65300" size={16} />
           </TouchableOpacity>
         </View>
 

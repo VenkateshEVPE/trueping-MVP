@@ -38,5 +38,11 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
       </activity>
+      
+      <!-- Background Actions Service - Required for Android 15+ (API 35+) -->
+      <service
+        android:name="com.asterinet.react.bgactions.RNBackgroundActionsTask"
+        android:foregroundServiceType="location"
+        android:exported="false" />
     </application>
 </manifest>

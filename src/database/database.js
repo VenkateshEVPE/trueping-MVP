@@ -601,10 +601,11 @@ export const getCurrentUser = async () => {
     if (results.rows.length > 0) {
       const user = results.rows.item(0)
       // Convert integer to boolean for boolean columns
+      // Handle case where permissions_granted column might not exist yet
       return {
         ...user,
         email_verified: user.email_verified === 1,
-        permissions_granted: user.permissions_granted === 1,
+        permissions_granted: user.permissions_granted === 1 || user.permissions_granted === true || false,
         skipped_login: user.skipped_login === 1,
       }
     } else {
@@ -612,6 +613,29 @@ export const getCurrentUser = async () => {
     }
   } catch (error) {
     console.error('Error getting current user:', error)
+    // If error is due to missing column, try to add it and retry
+    if (error.message && error.message.includes('no such column: permissions_granted')) {
+      try {
+        await db.executeSql('ALTER TABLE users ADD COLUMN permissions_granted INTEGER DEFAULT 0', [])
+        console.log('Added permissions_granted column to users table')
+        // Retry getting user
+        const [retryResults] = await db.executeSql(
+          'SELECT * FROM users WHERE (token IS NOT NULL AND token != "") OR skipped_login = 1 ORDER BY updated_at DESC LIMIT 1',
+          []
+        )
+        if (retryResults.rows.length > 0) {
+          const user = retryResults.rows.item(0)
+          return {
+            ...user,
+            email_verified: user.email_verified === 1,
+            permissions_granted: false,
+            skipped_login: user.skipped_login === 1,
+          }
+        }
+      } catch (retryError) {
+        console.error('Error retrying getCurrentUser after adding column:', retryError)
+      }
+    }
     return null
   }
 }
@@ -958,24 +982,47 @@ export const arePermissionsGranted = async () => {
 
     // Check if permissions_granted column exists, if not add it
     try {
-      const [results] = await db.executeSql(
-        "SELECT permissions_granted FROM users WHERE token IS NOT NULL AND token != '' ORDER BY updated_at DESC LIMIT 1",
-        []
-      )
-
-      if (results.rows.length > 0) {
-        const user = results.rows.item(0)
+      // First try to get current user and check their permissions
+      const currentUser = await getCurrentUser()
+      if (currentUser && currentUser.permissions_granted !== undefined) {
         // Convert integer to boolean
-        return user.permissions_granted === 1 || user.permissions_granted === true
+        return currentUser.permissions_granted === 1 || currentUser.permissions_granted === true
+      }
+
+      // Fallback: check users with tokens (for backward compatibility)
+      try {
+        const [results] = await db.executeSql(
+          "SELECT permissions_granted FROM users WHERE token IS NOT NULL AND token != '' ORDER BY updated_at DESC LIMIT 1",
+          []
+        )
+
+        if (results.rows.length > 0) {
+          const user = results.rows.item(0)
+          // Convert integer to boolean
+          return user.permissions_granted === 1 || user.permissions_granted === true
+        }
+      } catch (sqlError) {
+        // Column might not exist, try to add it
+        if (sqlError.message && sqlError.message.includes('no such column: permissions_granted')) {
+          try {
+            await db.executeSql('ALTER TABLE users ADD COLUMN permissions_granted INTEGER DEFAULT 0', [])
+            console.log('Added permissions_granted column to users table')
+          } catch (alterError) {
+            // Column might already exist, ignore
+            console.log('Column might already exist or error:', alterError.message)
+          }
+        }
       }
     } catch (error) {
-      // Column might not exist, try to add it
-      try {
-        await db.executeSql('ALTER TABLE users ADD COLUMN permissions_granted INTEGER DEFAULT 0', [])
-        console.log('Added permissions_granted column to users table')
-      } catch (alterError) {
-        // Column might already exist, ignore
-        console.log('Column might already exist or error:', alterError.message)
+      // If getCurrentUser fails, try to add column and check again
+      if (error.message && error.message.includes('no such column: permissions_granted')) {
+        try {
+          await db.executeSql('ALTER TABLE users ADD COLUMN permissions_granted INTEGER DEFAULT 0', [])
+          console.log('Added permissions_granted column to users table')
+        } catch (alterError) {
+          // Column might already exist, ignore
+          console.log('Column might already exist or error:', alterError.message)
+        }
       }
     }
 
@@ -996,14 +1043,38 @@ export const markPermissionsAsGranted = async () => {
       throw new Error('Database not initialized')
     }
 
-    // Update all users with tokens (current logged in user)
+    // Get current user first to ensure we update the correct user
+    const currentUser = await getCurrentUser()
+    
+    if (!currentUser) {
+      console.error('❌ No current user found to update permissions')
+      return false
+    }
+
+    // Update the current user by email (most reliable identifier)
     // Use 1 for true (SQLite stores booleans as INTEGER)
-    await db.executeSql(
-      "UPDATE users SET permissions_granted = 1, updated_at = CURRENT_TIMESTAMP WHERE token IS NOT NULL AND token != ''",
-      []
+    const [results] = await db.executeSql(
+      'UPDATE users SET permissions_granted = 1, updated_at = CURRENT_TIMESTAMP WHERE email = ?',
+      [currentUser.email]
     )
-    console.log('✅ Permissions marked as granted')
-    return true
+    
+    if (results.rowsAffected > 0) {
+      console.log('✅ Permissions marked as granted for user:', currentUser.email)
+      return true
+    } else {
+      console.warn('⚠️ No rows updated when marking permissions as granted')
+      // Fallback: try updating by token if email update didn't work
+      const [fallbackResults] = await db.executeSql(
+        "UPDATE users SET permissions_granted = 1, updated_at = CURRENT_TIMESTAMP WHERE token IS NOT NULL AND token != ''",
+        []
+      )
+      if (fallbackResults.rowsAffected > 0) {
+        console.log('✅ Permissions marked as granted (fallback by token)')
+        return true
+      }
+      console.error('❌ Failed to update permissions - no rows affected')
+      return false
+    }
   } catch (error) {
     console.error('❌ Error marking permissions as granted:', error)
     return false

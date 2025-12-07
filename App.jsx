@@ -6,7 +6,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useColorScheme } from 'nativewind';
 import React, { useEffect, useState } from 'react';
 import { ThemeProvider } from './src/context/ThemeContext';
-import { initDatabase, getCurrentUser, arePermissionsGranted, startDailyUptimeTracking, updateDailyUptime } from './src/database/database';
+import { initDatabase, getCurrentUser, startDailyUptimeTracking, updateDailyUptime } from './src/database/database';
+import { arePermissionsGranted } from './src/services/permissionsStorage';
 import { startBackgroundService, isBackgroundServiceRunning } from './src/services/BackgroundLocationService';
 import SplashScreen from './src/screens/SplashScreen';
 import SignInPage from './src/screens/SignIn';
@@ -34,22 +35,46 @@ const AppContent = () => {
         await initDatabase()
         console.log('Database initialized successfully')
         
-        // Start daily uptime tracking
-        await startDailyUptimeTracking()
+        // Start daily uptime tracking (with error handling)
+        try {
+          await startDailyUptimeTracking()
+        } catch (uptimeError) {
+          console.warn('⚠️ Failed to start daily uptime tracking:', uptimeError.message)
+          // Continue anyway - not critical
+        }
         
         // Update daily uptime every minute while app is running
         dailyUptimeInterval = setInterval(async () => {
-          await updateDailyUptime()
+          try {
+            await updateDailyUptime()
+          } catch (updateError) {
+            console.warn('⚠️ Failed to update daily uptime:', updateError.message)
+            // Don't crash - just log and continue
+          }
         }, 60000) // Update every 1 minute
         
         // Check if user exists in database
-        const currentUser = await getCurrentUser()
+        let currentUser = null
+        try {
+          currentUser = await getCurrentUser()
+        } catch (userError) {
+          console.error('❌ Error getting current user:', userError)
+          // Continue with no user - will go to sign in
+          currentUser = null
+        }
         
         if (currentUser) {
           // Check if user skipped login (now boolean)
           if (currentUser.skipped_login === true || currentUser.skipped_login === 1) {
             console.log('User skipped login, checking permissions...')
-            const permissionsGranted = await arePermissionsGranted()
+            let permissionsGranted = false
+            try {
+              permissionsGranted = await arePermissionsGranted()
+            } catch (permError) {
+              console.error('❌ Error checking permissions:', permError)
+              // Default to false - will go to permissions screen
+              permissionsGranted = false
+            }
             if (permissionsGranted) {
               console.log('Skipped login user found, permissions granted, navigating to tabs')
               
@@ -76,7 +101,14 @@ const AppContent = () => {
             }
           } else if (currentUser.token) {
           // User exists with token, check permissions
-          const permissionsGranted = await arePermissionsGranted()
+          let permissionsGranted = false
+          try {
+            permissionsGranted = await arePermissionsGranted()
+          } catch (permError) {
+            console.error('❌ Error checking permissions:', permError)
+            // Default to false - will go to permissions screen
+            permissionsGranted = false
+          }
           if (permissionsGranted) {
             console.log('User found in database, permissions granted, navigating to tabs')
             
