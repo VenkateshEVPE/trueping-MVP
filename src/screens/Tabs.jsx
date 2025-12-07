@@ -174,9 +174,9 @@ function MyTabs() {
       dataCollectionCleanup = startPeriodicDataCollection(120000)
       console.log('✅ Periodic device data collection started (every 2 minutes)')
       
-      // Start periodic upload service (every 30 seconds)
-      uploadServiceCleanup = startPeriodicUploadService(30000)
-      console.log('✅ Periodic upload service started (every 30 seconds)')
+      // Start periodic upload service (every 2 minutes)
+      uploadServiceCleanup = startPeriodicUploadService(120000)
+      console.log('✅ Periodic upload service started (every 2 minutes)')
     }
 
     startServices()

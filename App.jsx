@@ -75,31 +75,31 @@ const AppContent = () => {
               setInitialRoute('permissions')
             }
           } else if (currentUser.token) {
-            // User exists with token, check permissions
-            const permissionsGranted = await arePermissionsGranted()
-            if (permissionsGranted) {
-              console.log('User found in database, permissions granted, navigating to tabs')
-              
+          // User exists with token, check permissions
+          const permissionsGranted = await arePermissionsGranted()
+          if (permissionsGranted) {
+            console.log('User found in database, permissions granted, navigating to tabs')
+            
               // Start background service (data collection will start in tabs screen)
-              try {
-                const isRunning = await isBackgroundServiceRunning()
-                if (!isRunning) {
-                  console.log('📍 Starting BackgroundLocationService from App.jsx...')
-                  await startBackgroundService(false) // Don't show alerts
-                  // Give service a moment to initialize
-                  await new Promise(resolve => setTimeout(resolve, 1000))
-                } else {
-                  console.log('✅ BackgroundLocationService already running')
-                }
-              } catch (serviceError) {
-                console.warn('⚠️ Failed to start BackgroundLocationService in App.jsx:', serviceError.message)
-                // Continue anyway - service will start when Home screen loads
+            try {
+              const isRunning = await isBackgroundServiceRunning()
+              if (!isRunning) {
+                console.log('📍 Starting BackgroundLocationService from App.jsx...')
+                await startBackgroundService(false) // Don't show alerts
+                // Give service a moment to initialize
+                await new Promise(resolve => setTimeout(resolve, 1000))
+              } else {
+                console.log('✅ BackgroundLocationService already running')
               }
-              
-              setInitialRoute('tabs')
-            } else {
-              console.log('User found in database, permissions not granted, navigating to permissions')
-              setInitialRoute('permissions')
+            } catch (serviceError) {
+              console.warn('⚠️ Failed to start BackgroundLocationService in App.jsx:', serviceError.message)
+              // Continue anyway - service will start when Home screen loads
+            }
+            
+            setInitialRoute('tabs')
+          } else {
+            console.log('User found in database, permissions not granted, navigating to permissions')
+            setInitialRoute('permissions')
             }
           } else {
             // User exists but no token, go to sign in

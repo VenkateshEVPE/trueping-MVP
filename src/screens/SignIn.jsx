@@ -126,11 +126,11 @@ const SignIn = () => {
           } catch (error) {
             console.error('Error saving skip login user:', error)
             // Still navigate even if save fails
-            const permissionsGranted = await arePermissionsGranted()
-            if (permissionsGranted) {
-              navigation.replace('tabs')
-            } else {
-              navigation.replace('permissions')
+          const permissionsGranted = await arePermissionsGranted()
+          if (permissionsGranted) {
+            navigation.replace('tabs')
+          } else {
+            navigation.replace('permissions')
             }
           }
         }}>

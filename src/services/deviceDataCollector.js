@@ -369,63 +369,30 @@ export const collectStoreUploadAndCleanup = async () => {
       console.log('✅ Device data collected and stored successfully')
     }
 
-    // Step 3: Format collected data for immediate upload
-    const proofData = {
-      device_id: collectedData.deviceId || null,
-      unique_id: collectedData.uniqueId || null,
-      device_name: collectedData.deviceName || null,
-      os: collectedData.os || null,
-      os_version: collectedData.osVersion || null,
-      ip_address: collectedData.ipAddress || null,
-      network_type: collectedData.networkType || null,
-      airplane_mode: collectedData.airplaneMode ? 1 : 0,
-      internet_reachable: collectedData.internetReachable ? 1 : 0,
-      latitude: collectedData.latitude || null,
-      longitude: collectedData.longitude || null,
-      altitude: collectedData.altitude || null,
-      accuracy: collectedData.accuracy || null,
-      upload_speed: collectedData.uploadSpeed || null,
-      download_speed: collectedData.downloadSpeed || null,
-      avg_latency: collectedData.avgLatency || null,
-      best_latency: collectedData.bestLatency || null,
-      server_tested: collectedData.serverTested || null,
-      timestamp: collectedData.timestamp || Date.now(),
-    }
-
-    // Step 4: Upload the newly collected data immediately to API
-    console.log('📤 Uploading newly collected data to API...')
-    try {
-      const uploadResult = await uploadProofs([proofData])
-      if (uploadResult && uploadResult.success) {
-        console.log('✅ Successfully uploaded newly collected data to API')
-      } else {
-        console.warn('⚠️ Failed to upload newly collected data, will retry later')
-      }
-    } catch (uploadError) {
-      console.error('❌ Error uploading newly collected data:', uploadError)
-    }
-
-    // Step 5: Also upload any other unuploaded records from database
+    // Step 3: Get all unuploaded records (including the one we just stored)
     const unuploadedRecords = await getUnuploadedDeviceData(100) // Upload up to 100 records at a time
 
     if (unuploadedRecords.length > 0) {
-      console.log(`📤 Found ${unuploadedRecords.length} additional unuploaded records, uploading to API...`)
+      console.log(`📤 Found ${unuploadedRecords.length} unuploaded records, uploading to API...`)
       
+      // Step 4: Upload all unuploaded records to server
       const uploadSuccess = await uploadDeviceDataToServer(unuploadedRecords)
 
       if (uploadSuccess) {
-        // Delete uploaded records from SQLite
+        // Step 5: Delete uploaded records from SQLite
         const idsToDelete = unuploadedRecords.map((record) => record.id)
         const deleteSuccess = await deleteDeviceDataByIds(idsToDelete)
 
         if (deleteSuccess) {
-          console.log(`✅ Successfully uploaded and deleted ${unuploadedRecords.length} additional device data records`)
+          console.log(`✅ Successfully uploaded and deleted ${unuploadedRecords.length} device data records`)
         } else {
           console.warn('⚠️ Upload successful but failed to delete records from SQLite')
         }
       } else {
-        console.warn('⚠️ Upload of additional records failed, keeping records in SQLite for retry')
+        console.warn('⚠️ Upload failed, keeping records in SQLite for retry')
       }
+    } else {
+      console.log('ℹ️ No unuploaded device data records to upload')
     }
 
     return true
@@ -482,11 +449,11 @@ export const uploadPendingDeviceData = async () => {
 }
 
 /**
- * Start periodic upload service (collects new data and uploads every 30 seconds)
- * @param {number} intervalMs - Upload interval in milliseconds (default: 30000 = 30 seconds)
+ * Start periodic upload service (uploads pending data without collecting new data)
+ * @param {number} intervalMs - Upload interval in milliseconds (default: 120000 = 2 minutes)
  * @returns {Function} Cleanup function to stop upload service
  */
-export const startPeriodicUploadService = (intervalMs = 30000) => {
+export const startPeriodicUploadService = (intervalMs = 120000) => {
   // Prevent duplicate service starts
   if (isUploadServiceRunning && uploadServiceInterval) {
     console.log('⚠️ Upload service is already running, skipping duplicate start')
@@ -497,15 +464,15 @@ export const startPeriodicUploadService = (intervalMs = 30000) => {
 
   console.log(`🔄 Starting periodic upload service (interval: ${intervalMs}ms = ${intervalMs / 1000} seconds)`)
 
-  // Collect, store, upload, and cleanup immediately
-  collectStoreUploadAndCleanup().catch(error => {
+  // Upload pending data immediately (without collecting new data)
+  uploadPendingDeviceData().catch(error => {
     console.error('❌ Error in initial upload service call:', error)
   })
 
-  // Set up interval to collect and upload every 30 seconds
+  // Set up interval to upload pending data every 2 minutes (without collecting new data)
   uploadServiceInterval = setInterval(() => {
-    console.log(`⏰ Upload service tick - collecting and uploading data...`)
-    collectStoreUploadAndCleanup().catch(error => {
+    console.log(`⏰ Upload service tick - uploading pending data...`)
+    uploadPendingDeviceData().catch(error => {
       console.error('❌ Error in periodic upload service call:', error)
     })
   }, intervalMs)

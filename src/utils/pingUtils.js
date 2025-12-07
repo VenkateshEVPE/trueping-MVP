@@ -87,14 +87,14 @@ export const performSpeedTest = async () => {
 
         // Validate ping result
         if (ms && ms > 0 && ms < 10000) {
-          results.push({
-            server: server.name,
-            ip: server.ip,
-            latency: ms,
-            testTime: endTime - startTime,
-          })
+        results.push({
+          server: server.name,
+          ip: server.ip,
+          latency: ms,
+          testTime: endTime - startTime,
+        })
 
-          console.log(`✅ ${server.name} (${server.ip}): ${ms}ms`)
+        console.log(`✅ ${server.name} (${server.ip}): ${ms}ms`)
         } else {
           console.warn(`⚠️ ${server.name} (${server.ip}) returned invalid result: ${ms}ms`)
         }
