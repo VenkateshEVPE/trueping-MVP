@@ -8,6 +8,10 @@ const IPLatencyProofs = ({ insets, deviceId, cpuUsage, ramUsage, proofsSubmitted
   // Debug: Log what values we're receiving
   console.log('📱 IPLatencyProofs received:', { cpuUsage, ramUsage, proofsSubmittedToday })
   
+  // Format CPU and RAM with fallback
+  const formattedCpu = cpuUsage || '0%'
+  const formattedRam = ramUsage || '0%'
+  
   return (
     <View className="absolute flex-row items-baseline justify-between px-5" style={{ left: SCREEN_WIDTH / 2 - 183.3105, top: 373 + insets.top, width: 366.621 }}>
       <View className="items-start" style={{ gap: 5 }}>
@@ -41,13 +45,13 @@ const IPLatencyProofs = ({ insets, deviceId, cpuUsage, ramUsage, proofsSubmitted
           <Text className="text-[14px] text-white font-satoshi text-right" style={{ letterSpacing: 0.15 }}>
             <Text>CPU </Text>
           </Text>
-          <Text className="text-[14px] text-[#212322] font-offBit101Bold text-right px-2" style={{ letterSpacing: 0.15 }}>{cpuUsage}</Text>
+          <Text className="text-[14px] text-[#212322] font-offBit101Bold text-right px-2" style={{ letterSpacing: 0.15 }}>{formattedCpu}</Text>
         </View>
         <View className="flex-row items-baseline" style={{ gap: 0 }}>
           <Text className="text-[14px] text-white font-satoshi text-right" style={{ letterSpacing: 0.15 }}>
             <Text>RAM </Text>
           </Text>
-          <Text className="text-[14px] text-[#212322] font-offBit101Bold text-right px-2" style={{ letterSpacing: 0.15 }}>{ramUsage}</Text>
+          <Text className="text-[14px] text-[#212322] font-offBit101Bold text-right px-2" style={{ letterSpacing: 0.15 }}>{formattedRam}</Text>
         </View>
       </View>
     </View>
